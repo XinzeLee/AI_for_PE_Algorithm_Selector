@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI for Power Electronics — Algorithm Selector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-inner">
+        <p class="status-banner" role="status">
+          Under construction — flows and recommendations are still being refined.
+        </p>
+        <h1>AI for Power Electronics — Algorithm Selector</h1>
+        <div class="authorship-block">
+          <p>
+            <strong>App author:</strong> Xinze Li
+          </p>
+          <p>
+            <strong>Tutorial article:</strong> Xinze Li, Fanfan Lin, Juan J. Rodríguez-Andina, Sergio Vazquez, Homer Alan Mantooth, Leopoldo García Franquelo,
+            “Fundamentals of Artificial Intelligences for Power Electronics,”
+            <em>IEEE Transactions on Industrial Electronics</em>, 2026.
+          </p>
+        </div>
+        <p class="tagline">
+          Step-by-step guidance aligned with the IEEE tutorial
+          <em>Fundamentals of Artificial Intelligences for Power Electronics</em>
+          and the open course repository
+          <a href="https://github.com/XinzeLee/Fundamentals_of_AI_for_PE" target="_blank" rel="noopener">Fundamentals_of_AI_for_PE</a>.
+        </p>
+      </div>
+    </header>
+
+    <nav class="progress" aria-label="Progress">
+      <ol class="progress-steps" id="progress-steps"></ol>
+    </nav>
+
+    <main class="main">
+      <section class="panel" id="wizard-panel">
+        <div id="step-container"></div>
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" id="btn-back" hidden>Back</button>
+          <button type="button" class="btn btn-primary" id="btn-next" hidden>Continue</button>
+          <button type="button" class="btn btn-ghost" id="btn-restart" hidden>Start over</button>
+        </div>
+      </section>
+
+      <section class="panel results" id="results-panel" hidden>
+        <p class="results-panel-kicker">Structured report</p>
+        <h2 class="results-panel-title">Your algorithm report</h2>
+        <p class="results-panel-lede">Read from top to bottom: overview → workflow → path-specific notes → techniques and links.</p>
+        <div id="results-summary"></div>
+        <div id="results-flags" class="flag-strip" hidden aria-hidden="true"></div>
+        <div id="results-body"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Educational tool — verify assumptions for your hardware, safety, and deployment constraints.
+        <strong>App:</strong> Xinze Li &middot;
+        <a href="https://github.com/XinzeLee/Fundamentals_of_AI_for_PE" target="_blank" rel="noopener">course repo</a>
+        (resources also under refinement).
+      </p>
+    </footer>
+  </div>
+
+  <div id="tooltip-layer" class="tooltip-layer" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
