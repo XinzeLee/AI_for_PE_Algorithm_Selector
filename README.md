@@ -26,6 +26,8 @@
 
 Interactive wizard that recommends AI/ML approaches aligned with the tutorial article and the [**Fundamentals_of_AI_for_PE**](https://github.com/XinzeLee/Fundamentals_of_AI_for_PE) notebooks.
 
+**ChatGPT companion:** For deeper Q&A and report-style help, a button below the wizard and report (above the disclaimer footer) opens the [**Fundamentals of AI for PE**](https://chatgpt.com/g/g-698618895c2481919e113c49bafe23ee-fundamentals-of-ai-for-pe) Custom GPT in a new tab.
+
 ---
 
 ## Run locally

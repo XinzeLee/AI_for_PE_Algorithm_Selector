@@ -99,6 +99,114 @@ a:hover {
   max-width: 52rem;
 }
 
+.gpt-promo {
+  margin-top: 1.35rem;
+  padding: 1rem 1.15rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(94, 184, 255, 0.55);
+  background: linear-gradient(
+    155deg,
+    rgba(61, 158, 255, 0.22) 0%,
+    rgba(19, 24, 32, 0.92) 48%,
+    rgba(12, 15, 20, 0.98) 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 10px 40px rgba(0, 0, 0, 0.45),
+    0 0 48px rgba(61, 158, 255, 0.12);
+}
+
+.gpt-promo--footer {
+  margin-top: 1.75rem;
+  margin-bottom: 0.35rem;
+  padding: 0.85rem 1rem 0.9rem;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    0 0 32px rgba(61, 158, 255, 0.1);
+}
+
+.gpt-promo-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9ed4ff;
+  margin: 0 0 0.65rem;
+}
+
+.gpt-promo--footer .gpt-promo-label {
+  margin-bottom: 0.5rem;
+}
+
+.gpt-promo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+}
+
+.gpt-promo-hint {
+  margin: 0;
+  flex: 1 1 12rem;
+  font-size: 0.8rem;
+  color: #c5d2e3;
+  max-width: 32rem;
+  line-height: 1.45;
+}
+
+.btn-gpt {
+  font-family: var(--font);
+  text-decoration: none;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.48rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #7eb8ff;
+  color: #030810;
+  background: linear-gradient(180deg, #5eb4ff 0%, #2d7ec9 50%, #1a6aad 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 4px 14px rgba(61, 158, 255, 0.38),
+    0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn-gpt:hover {
+  color: #02060c;
+  filter: brightness(1.06);
+  border-color: #a8d4ff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.38) inset,
+    0 5px 18px rgba(61, 158, 255, 0.48),
+    0 2px 6px rgba(0, 0, 0, 0.32);
+  transform: translateY(-1px);
+}
+
+.btn-gpt:active {
+  transform: translateY(0);
+  filter: brightness(0.97);
+}
+
+.footer {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.footer p {
+  margin: 0;
+}
+
 .progress {
   margin-bottom: 1.25rem;
 }
