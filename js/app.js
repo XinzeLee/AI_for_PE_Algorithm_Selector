@@ -529,14 +529,98 @@ function computeResults() {
  * Top-down report block: skip empty content.
  * @param {string} title
  * @param {string} innerHtml
+ * @param {string} [sectionClass] extra class on section (e.g. report-section--recommend)
  */
-function reportBlock(title, innerHtml) {
+function reportBlock(title, innerHtml, sectionClass) {
   const t = String(innerHtml ?? "").trim();
   if (!t) return "";
-  return `<section class="report-section">
+  const cls = sectionClass ? `report-section ${sectionClass}` : "report-section";
+  return `<section class="${cls}">
     <h3 class="report-h3">${title}</h3>
     <div class="report-section-body">${innerHtml}</div>
   </section>`;
+}
+
+/** First ~2 sentence units from tuning text for the at-a-glance block (keeps markdown). */
+function tuningExcerptForGlance(md) {
+  if (!md) return "";
+  const s = String(md).trim();
+  const parts = s.split(/\.\s+/);
+  if (parts.length <= 2) return s;
+  return parts.slice(0, 2).join(". ") + ".";
+}
+
+/**
+ * @param {string | { input?: string, hidden?: string, outputLoss?: string } | undefined} architecture
+ * @param {"glance" | "card"} variant
+ */
+function renderArchitectureHtml(architecture, variant) {
+  if (!architecture) return "";
+  const wrapClass = variant === "card" ? "algo-architecture" : "recommend-glance-arch";
+  if (typeof architecture === "string") {
+    return `<div class="${wrapClass} ${wrapClass}--legacy"><span class="recommend-glance-k">Architecture (legacy)</span><p>${formatRichText(architecture)}</p></div>`;
+  }
+  const input = architecture.input || "";
+  const hidden = architecture.hidden || "";
+  const out = architecture.outputLoss || "";
+  const blocks = [
+    { k: "Input layer & modality interface", t: input },
+    { k: "Hidden layers & data invariants", t: hidden },
+    { k: "Output layer, loss & learning task", t: out },
+  ].filter((x) => String(x.t).trim());
+  if (!blocks.length) return "";
+  return `<div class="${wrapClass}">${blocks
+    .map(
+      ({ k, t }) =>
+        `<div class="arch-block"><span class="recommend-glance-k">${k}</span><p>${formatRichText(t)}</p></div>`
+    )
+    .join("")}</div>`;
+}
+
+/**
+ * Highlighted block: algorithm names + role + tuning excerpt, or full path detail when there are no cards.
+ * @param {object} rec
+ * @param {string} pathDetailHtml
+ * @param {boolean} promotePathOnly when true, path detail is shown only here (not repeated below)
+ */
+function renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly) {
+  const algos = rec.algorithms || [];
+  if (algos.length) {
+    const items = algos
+      .map((a, i) => {
+        const ex = a.tuning ? tuningExcerptForGlance(a.tuning) : "";
+        const arch = renderArchitectureHtml(a.architecture, "glance");
+        return `<li class="recommend-glance-item">
+        <span class="recommend-glance-n" aria-hidden="true">${i + 1}</span>
+        <div class="recommend-glance-main">
+          <strong class="recommend-glance-title">${escapeHtml(a.name)}</strong>
+          <div class="recommend-glance-role"><p>${formatRichText(a.intro || "")}</p></div>
+          ${arch}
+          ${
+            ex
+              ? `<div class="recommend-glance-tuning"><span class="recommend-glance-k">Tuning & validation (essentials)</span><p>${formatRichText(ex)}</p></div>`
+              : ""
+          }
+        </div>
+      </li>`;
+      })
+      .join("");
+    return reportBlock(
+      "Recommended algorithms",
+      `<p class="recommend-glance-lede">Start here: <strong>named methods</strong> and, for neural recommendations, three layers of detail—how the <strong>input layer</strong> interfaces <strong>data modalities</strong>, how <strong>hidden</strong> structure reflects <strong>invariants</strong>, and how <strong>outputs + loss</strong> tie to the <strong>learning task</strong>. Supporting tutorial excerpts and repo mapping come <strong>after</strong> the detailed cards below.</p>
+      <ol class="recommend-glance-list">${items}</ol>`,
+      "report-section--recommend"
+    );
+  }
+  if (promotePathOnly && String(pathDetailHtml).trim()) {
+    return reportBlock(
+      "Recommended approaches for this path",
+      `<p class="recommend-glance-lede">This branch has no separate algorithm cards—the items below are your <strong>primary</strong> guidance (model families, workflow, pitfalls). Tutorial cross-checks follow afterward.</p>
+      <div class="recommend-glance-path-wrap">${pathDetailHtml}</div>`,
+      "report-section--recommend"
+    );
+  }
+  return "";
 }
 
 /**
@@ -624,20 +708,27 @@ function renderResults(rec) {
     }
   }
 
+  const hasAlgoCards = (rec.algorithms || []).length > 0;
+  const promotePathOnly = !hasAlgoCards && String(pathDetailHtml).trim().length > 0;
+  const pathDetailForContext = promotePathOnly ? "" : pathDetailHtml;
+
   const hero = `<header class="report-hero">
     <h3 class="report-title">${escapeHtml(rec.title || "Report")}</h3>
     ${pathLine}
   </header>`;
 
+  const tutorialContextHtml =
+    renderArticleSections(rec.articleSections) +
+    renderRepoAlignment(rec.repoAlignment) +
+    reportBlock("This modality path in detail", pathDetailForContext) +
+    reportBlock("Paper cross-checks", rec.reviewContextHtml ? formatRichText(rec.reviewContextHtml, { html: true }) : "");
+
   summary.innerHTML = `${hero}
+    ${renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly)}
     ${reportBlock("Situation & goal", rec.summary ? `<p class="report-lede">${formatRichText(rec.summary)}</p>` : "")}
     ${reportBlock("Label / data regime", rec.scarceHtml ? formatRichText(rec.scarceHtml, { html: true }) : "")}
     ${reportBlock("Techniques in scope", pillsHtml)}
-    ${reportBlock("Standard workflow (tutorial)", rec.tutorialPipelineHtml ? formatRichText(rec.tutorialPipelineHtml, { html: true }) : "")}
-    ${renderArticleSections(rec.articleSections)}
-    ${renderRepoAlignment(rec.repoAlignment)}
-    ${reportBlock("This modality path in detail", pathDetailHtml)}
-    ${reportBlock("Paper cross-checks", rec.reviewContextHtml ? formatRichText(rec.reviewContextHtml, { html: true }) : "")}`;
+    ${reportBlock("Standard workflow (tutorial)", rec.tutorialPipelineHtml ? formatRichText(rec.tutorialPipelineHtml, { html: true }) : "")}`;
 
   const flagsEl = el("results-flags");
   flagsEl.innerHTML = "";
@@ -646,16 +737,15 @@ function renderResults(rec) {
   const body = el("results-body");
   let h = "";
 
-  const hasAlgos = (rec.algorithms || []).length > 0;
-  if (hasAlgos) {
+  if (hasAlgoCards) {
     h += `<div class="report-body-intro">
-      <h2 class="report-part-title">Techniques & course materials</h2>
-      <p class="report-part-lede">Below: one card per recommended family—read <strong>role</strong> first, then <strong>tuning</strong>, then <strong>resources</strong>. Cross-cutting notebooks follow the cards.</p>
+      <h2 class="report-part-title">Algorithm details & course materials</h2>
+      <p class="report-part-lede">Each card expands the same recommendation with <strong>full tuning guidance</strong>, <strong>tutorial cases</strong>, <strong>how this aligns with the paper</strong>, and <strong>notebook links</strong>. After the cards: article excerpts, repo mapping, path notes, and cross-checks.</p>
     </div>`;
   } else {
     h += `<div class="report-body-intro">
-      <h2 class="report-part-title">Resources</h2>
-      <p class="report-part-lede">No algorithm cards for this branch—see sections above and the links below.</p>
+      <h2 class="report-part-title">Deeper context & resources</h2>
+      <p class="report-part-lede">Your main path guidance is in <strong>Recommended approaches for this path</strong> above. Below: tutorial discussion, course folder mapping, paper cross-checks, and further reading.</p>
     </div>`;
   }
 
@@ -674,10 +764,14 @@ function renderResults(rec) {
     const tricksSecRendered = a.tricks
       ? `<section class="algo-sec"><h4 class="algo-h4">Practical tips</h4><p>${tricksH}</p></section>`
       : "";
+    const archSec = a.architecture
+      ? `<section class="algo-sec algo-sec--arch"><h4 class="algo-h4">Architecture & learning objective</h4>${renderArchitectureHtml(a.architecture, "card")}</section>`
+      : "";
     h += `<article class="algo-card">
       <h3 class="algo-title">${escapeHtml(a.name)}</h3>
-      <section class="algo-sec"><h4 class="algo-h4">Role & when to use</h4><p>${introH}</p></section>
-      <section class="algo-sec"><h4 class="algo-h4">Tuning & validation</h4><p>${tuningH}</p></section>
+      <section class="algo-sec"><h4 class="algo-h4">What to use & why</h4><p>${introH}</p></section>
+      ${archSec}
+      <section class="algo-sec"><h4 class="algo-h4">Tuning & validation (full)</h4><p>${tuningH}</p></section>
       ${tricksSecRendered}
       <section class="algo-sec"><h4 class="algo-h4">Tutorial case</h4><p>${caseH}</p></section>
       <section class="algo-sec"><h4 class="algo-h4">Paper alignment</h4><p class="paper-note">${paperH}</p></section>
@@ -685,6 +779,14 @@ function renderResults(rec) {
       ${ext ? `<section class="algo-sec"><h4 class="algo-h4">External references</h4><ul class="link-list">${ext}</ul></section>` : ""}
     </article>`;
   });
+
+  if (tutorialContextHtml.trim()) {
+    h += `<div class="report-context-wrap">
+      <h2 class="report-part-title">Tutorial context & cross-checks</h2>
+      <p class="report-part-lede">Article excerpts, course-to-paper mapping, path notes, and paper reminders—<strong>after</strong> the algorithm recommendations above.</p>
+      ${tutorialContextHtml}
+    </div>`;
+  }
 
   if (rec.customBlocks) {
     rec.customBlocks.forEach((b) => {

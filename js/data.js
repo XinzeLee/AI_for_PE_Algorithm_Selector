@@ -13,6 +13,17 @@ export function ghTree(folderPath) {
   return `${REPO_ROOT}/tree/main/${folderPath}`;
 }
 
+/**
+ * Structured NN description for the report UI: how modalities enter the net, what invariants
+ * the hidden stack encodes, and how outputs + loss match the learning task.
+ * @param {string} inputModality
+ * @param {string} hiddenInvariants
+ * @param {string} outputLossTask
+ */
+function arch(inputModality, hiddenInvariants, outputLossTask) {
+  return { input: inputModality, hidden: hiddenInvariants, outputLoss: outputLossTask };
+}
+
 /** @type {Record<string, string>} */
 export const GLOSSARY = {
   phase:
@@ -416,6 +427,11 @@ const MODEL_PAIRS = {
         name: "XGBoost / Random Forest",
         intro:
           "Gradient-boosted trees and bagged trees are strong **baselines** on tabular PE data: they respect column semantics and handle nonlinearities; piecewise surfaces may **extrapolate poorly** in sparse regions.",
+        architecture: arch(
+          "The **input layer** is a fixed-order **tabular vector**: scaled numeric features plus encoded categoricals. The modality interface is column-wise and **rotation-variant** (column order carries meaning), which matches PE design tables and operating-condition datasets.",
+          "The **hidden structure** is an ensemble of trees. Each split creates piecewise regions in feature space, revealing invariants as **axis-aligned decision rules** and feature-threshold interactions. Boosting adds residual correction across trees; bagging stabilizes variance through bootstrap aggregation.",
+          "The **output layer** aggregates leaf values: weighted sums for regression or logits/probabilities for classification. **Loss** follows the learning task: squared error/Huber for supervised regression, logistic loss or cross-entropy for supervised classification. The training objective directly ties to labeled tabular outputs."
+        ),
         tuning:
           "Depth, estimators, learning rate (XGBoost); subsample/colsample; **class imbalance** handling for FDD. Paper: correlation/t-SNE-driven feature pruning (DAB example).",
         tricks:
@@ -434,7 +450,12 @@ const MODEL_PAIRS = {
       {
         name: "Feedforward neural networks (MLP)",
         intro:
-          "Universal approximators for smooth surrogates; **Tanh** activations mentioned for smoother landscapes vs. tree staircases in the paper’s comparison narrative.",
+          "Universal approximators for **tabular → tabular** surrogates: each column is a physically meaningful coordinate, so the **input** is the full feature row after **scaling/normalization**. The tutorial contrasts **piecewise tree** surfaces with **smoother** MLP landscapes—often **Tanh** or SiLU—for interpolation between simulation or lab points.",
+        architecture: arch(
+          "The **input layer** is one **vector** per sample: length = number of **tabular** fields after **scaling/normalization**, plus **one-hot** or **small embeddings** for categoricals. This is exactly how **tabular modality** is interfaced—each component maps to a **named physical variable** (rating, duty, loss, etc.); **permuting columns would corrupt meaning**, so the net sees a **fixed-order** design vector, matching the paper’s **rotation-variance** point.",
+          "**Hidden** layers are **fully connected** stacks (**2–4** blocks, widths often **32–512**) with **Tanh/SiLU**. That stack **encodes** an invariant of **smooth, composable nonlinear maps** over the operating envelope (unlike **axis-aligned tree** splits). **LayerNorm** and **residual** FC paths help when features span **orders of magnitude** after scaling—aligning with the tutorial’s emphasis on **feature scaling** before NNs.",
+          "The **output layer** is **affine**: **one unit per continuous KPI** for **regression** or **C logits** for **C-way classification** (**softmax**). **Loss** is **MSE/Huber** when targets are real-valued efficiencies/stresses (**supervised regression**), or **cross-entropy** when targets are discrete labels (**supervised classification**)—each loss directly scores mismatch against **labeled outputs** for the task. **Weight decay** and **early stopping** regularize optimization but are not part of the forward I/O contract."
+        ),
         tuning:
           "Depth/width, early stopping, **L1/L2**, learning rate schedules; always **scale features** for PE magnitudes.",
         tricks:
@@ -455,7 +476,12 @@ const MODEL_PAIRS = {
       {
         name: "Encoder–decoder (FNN + RNN/CNN/Transformer)",
         intro:
-          "Front MLP encodes tabular context; recurrent or causal 1D conv/Transformer blocks model **temporal causality** in outputs.",
+          "Maps **static tabular context** (design, setpoints) to a **sequence** (waveform, spectrum, time series of losses). A **tabular encoder** summarizes context; a **sequence decoder** must respect **causality** and **locality** along time or frequency—do not treat output samples as unrelated scalar slots.",
+        architecture: arch(
+          "**Input** has two roles: (1) **tabular encoder input**—a **scaled feature vector** (design, setpoint, ambient) that **conditions** the whole sequence; (2) **decoder inputs**—during training, **previous output tokens** or **teacher-forced** targets; at inference, **autoregressive** feedback. **Signal-domain modality** appears only in the **decoder path** as **ordered** time or frequency bins—**not** as independent scalar slots—so the interface respects **sequence structure**.",
+          "The **hidden** stack is an **MLP encoder** → **context vector** **z**, then a **decoder** of **LSTM/GRU**, **causal 1D CNN**, or **masked Transformer** blocks. That design **enforces invariants** of **locality** and **causality** along the sequence axis (what the paper stresses vs. naive windowing). **Bi-directionality** belongs only where **future context** is physically known (e.g. offline spectra); otherwise **causal masks** preserve **physical time order**.",
+          "**Outputs** are **per-step linear** projections: **real amplitudes** (**regression**) or **logits** (**classification**) for each time/frequency index. **Loss** sums **MSE/CE** over **valid** positions (and **masks** padding)—directly aligning with **supervised sequence** targets such as a waveform template or spectral envelope. The learning task is **conditional generation** of **signal modality** from **tabular context**."
+        ),
         tuning: "Sequence length, hidden size, mask causal conv/attention for forecasting tasks.",
         tricks:
           "If outputs are **spectra**, treat frequency bins as sequence or use **1D CNN** with appropriate padding; align phase with a **reference edge** (switching instant) when waveforms are misaligned.",
@@ -475,7 +501,12 @@ const MODEL_PAIRS = {
       {
         name: "Graph neural networks (GCN, GAT, GraphSAGE)",
         intro:
-          "Produce or refine graphs (e.g., topology candidates) conditioned on tabular specs. Paper discusses graphs for layouts, EMI, and topology reasoning.",
+          "Generate or refine **graphs** (nodes/edges = devices, nets, layout) **conditioned** on tabular design specs. The paper stresses **connectivity** and **multi-hop** effects for layouts and EMI—decoders are often **autoregressive** (add edge/node) or **one-shot** matrix heads with validity constraints.",
+        architecture: arch(
+          "**Input layer** fuses **tabular modality** (global specs as a vector, sometimes **broadcast** onto nodes or concatenated to each node state) with **graph modality**: **node features** (device types, ratings, pins) and **edge features** (net class, parasitic tags) plus **topology** (**adjacency**). The interface is **relational**: the same net sees **who connects to whom**, not a single categorical **layout ID**.",
+          "**Hidden** layers are **message-passing** (**GCN**, **GraphSAGE**, **GAT**): each step **aggregates neighbors**, revealing invariants of **connectivity**, **local neighborhoods**, and **multi-hop influence**—the tutorial’s graph invariants. Depth trades **receptive field** vs. **over-smoothing**; **attention** (GAT) weights which edges matter for EMI or stress paths.",
+          "**Outputs** are **logits** over **edges/nodes** (**BCE/CE**) for **discrete** structure, or **linear** heads for **continuous** attributes. **Loss** matches the **generative or refinement task**: e.g. **cross-entropy** on supervised topology, **MSE** on continuous attributes, plus optional **soft penalties** for **Kirchhoff** or **design rules**—linking optimization to **feasible** PE graphs."
+        ),
         tuning: "Layers, heads (GAT), neighbor sampling for large graphs.",
         tricks:
           "Validate generated graphs with **design rules** (netlists, clearance) before trusting optimizers; combine **graph VAE / autoregressive** decoders with constraint penalties.",
@@ -498,7 +529,12 @@ const MODEL_PAIRS = {
       {
         name: "Physics-informed neural networks (PINN)",
         intro:
-          "Train with data loss + **physics residual** on collocation points; supports inverse problems (identify coefficients).",
+          "A scalar or vector field **u** (temperature, potential, flux-related quantity) is represented by an MLP or CNN over **coordinates** (and parameters). Training blends **supervised** points with **PDE residuals** at **collocation** points so the net respects governing equations; supports **inverse** mode to identify unknown coefficients.",
+        architecture: arch(
+          "**Input layer** concatenates **field modality** support—**coordinates** **(x,y,z,t)** (often **normalized**)—with optional **tabular/design parameters** (material, geometry knobs) so the same network can **condition** the field on the converter instance. **Collocation points** are additional **inputs** used only in the **PDE term**, not as supervised labels.",
+          "**Hidden** trunk is an **MLP** (or **conv** on structured grids) that approximates **u(x,…)**. Its role is to be **flexible** enough to fit data while **PDE residuals** in the loss **impose invariants** of **governing equations** and **boundaries**—the **physics-informed** invariant rather than pure **translation equivariance** of a blind CNN.",
+          "**Output** is field value(s) **u** (or **multi-channel** fields); **inverse PINNs** also expose **trainable scalars** (**R**, **k**) that enter the **residual**. **Loss** = **MSE** on **measured** points (**supervised** fit to **field or probe data**) + **λ**·**‖PDE(u)‖²** (+ **BC/IC** terms). **λ** balances **data vs. physics**; the learning task is **regression under PDE constraints**, not classification."
+        ),
         tuning: "Loss weighting data vs. PDE terms; learning rate; many epochs may be needed.",
         caseStudy: "Tutorial apparent-power constraint example; thermal/EM PDE contexts.",
         paper: PAPER.piml_loss,
@@ -507,7 +543,13 @@ const MODEL_PAIRS = {
       },
       {
         name: "CNN / FNN field decoders",
-        intro: "Treat gridded fields like images when physics embedding is secondary—faster but less physically constrained.",
+        intro:
+          "When explicit **PDE residuals** are optional, treat **gridded** field data as **2D/3D tensors**: a **CNN encoder–decoder** (or U-Net) maps **parameter vector** or **coarse field** to **fine field**; alternatively **flatten** voxels and use an **MLP** (loses locality but simple for small grids).",
+        architecture: arch(
+          "**Input** couples **tabular modality** (parameters as an **MLP** vector, sometimes **broadcast** or **FiLM**-scaled into conv feature maps) with **field modality** as a tensor **(C×H×W)**—channels may be **material IDs**, **sources**, or **coarse** physics fields. The **interface** is **hybrid**: static **design context** modulates **spatial** computation.",
+          "**Hidden** **encoder–decoder** (**U-Net**-style or stacked **conv**) assumes **local spatial correlation** (**CNN invariants**: locality, weight sharing across space) but **does not** embed **PDE** unless you add a **PINN** term. Skip links preserve **multi-scale** structure (fine hotspots inside coarse envelopes)—useful for **thermal/flux** patterns.",
+          "**Output** is a **field tensor** aligned with targets (same **H×W** or a **super-resolution** target). **Loss** is **MSE/L1** on pixels (**supervised field regression**); optional **gradient** loss sharpens **interfaces**. Adding **PDE residuals** later turns the training objective into **physics-regularized** regression."
+        ),
         tuning: "Convolution kernel sizes, depth; normalization layers.",
         caseStudy: "**Magnetic modeling** notebooks use NN field mappings.",
         paper: "Field data section contrasts image-like treatment vs. geometry-aware modeling.",
@@ -525,7 +567,12 @@ const MODEL_PAIRS = {
       {
         name: "Modular deep networks",
         intro:
-          "Separate encoders for tabular vs. other tensors; fusion then task heads—common for performance modeling with heterogeneous PE data.",
+          "Each **modality** (tabular, waveform snippet, image, graph) has its own **encoder**; **fusion** (concat, **attention**, **gating**) forms a joint embedding before **task heads**. Matches heterogeneous PE datasets (e.g. operating point + scope capture + thermal image).",
+        architecture: arch(
+          "Each **modality** has its own **input interface**: **tabular** → **MLP** input vector; **signal** → **1D** tensor; **field** → **2D/3D** grid; **graph** → **node/edge** tensors. **No early concatenation** of raw pixels with scalars—each branch **encodes** its native structure first, which preserves **per-modality invariants** before fusion.",
+          "**Hidden** stacks are **parallel encoders** → embeddings **e₁, e₂, …**; **fusion** (**concat+MLP**, **gating**, or **cross-attention**) learns **which modality** drives which regime. Invariants: **tabular rotation-variance** stays inside the **MLP**; **translation/ locality** stays inside **CNN**; **causality** inside **RNN/1D CNN**; **connectivity** inside **GNN**.",
+          "**Output heads** are **task-specific**: **linear** scalars (**MSE**), **softmax** (**CE**), etc. **Loss** is typically **Σ wᵢ Lᵢ** over tasks plus optional **auxiliary** self-supervised terms per branch—explicitly tying training to **multi-task** PE objectives (efficiency + hotspot + classification) when labels exist."
+        ),
         tuning: "Per-branch widths, dropout, fusion choice; ablation recommended in paper.",
         caseStudy: "**one_stop_AI_DAB_modulation.ipynb** multi-model workflow.",
         paper: PAPER.nn_practice,
@@ -543,7 +590,12 @@ const MODEL_PAIRS = {
       {
         name: "LSTM / GRU / 1D CNN / Transformer encoders",
         intro:
-          "Encode locality and multi-scale phenomena; tutorial contrasts with sliding-window MLP on **Dataset III** time-series task.",
+          "Maps **waveform or spectrum** to **tabular** labels (efficiency class, fault, RMS stress). The encoder must respect **order** along time or frequency; the tutorial contrasts this with **sliding-window + MLP** that drops long-range and causal structure.",
+        architecture: arch(
+          "The **input layer** presents **signal-domain** data as a **tensor (batch, channels, length)**: channels are **voltage/current** traces, **harmonic amplitudes**, or **spectral bins**. **Interface to modality:** the **ordering** along **length** is **meaningful** (time or frequency index)—you **normalize** amplitude and often **align** to a **switching edge** so phase is comparable across samples. This is **not** tabular: shuffling positions destroys **causality** and **locality**.",
+          "**Hidden** layers are **LSTM/GRU** stacks, **dilated 1D CNNs**, or **Transformer** blocks with **causal masks** where **future** must not leak into the representation. They **encode invariants** of **sequential locality** (neighboring samples related), **multi-scale** structure (ringing inside envelopes), and **causal** propagation—what the tutorial contrasts with **windowed MLPs**. **BiLSTM** only if **backward** context is **physically observable** (e.g. offline batch). **Pooling** (last state, **attention**, or **GAP**) **collapses** time to a **vector** for **tabular-style** targets.",
+          "The **output layer** is **linear** on the pooled embedding: **K** units for **K-way softmax** (**classification** of health mode / efficiency bin) or **one** unit per **regression** target (**MSE/Huber** loss). **Loss** directly implements the **supervised task**: match **labels** (fault class, RMS stress, efficiency). **Weighted CE** or **focal loss** address **rare** fault classes—still **supervised**, not generative."
+        ),
         tuning: "Hidden size, layers, bidirectionality (check leakage), calibration to switching edges.",
         tricks:
           "Align windows to **switching edges** or fundamental frequency to reduce **phase ambiguity**; use **causal** masks for conv/Transformer when predicting **future** samples the system has not yet seen.",
@@ -555,7 +607,12 @@ const MODEL_PAIRS = {
       {
         name: "PANN (physics-in-architecture RNN)",
         intro:
-          "Specialized recurrent structure with embedded converter physics—orders-of-magnitude data reduction in tutorial claims (see PANN README).",
+          "Instead of a generic LSTM, **states and transitions** follow **converter equations** (switching, averaged, or hybrid models) with **trainable parameters**—reduces data needs when the **structure** matches the real hardware (see PANN README).",
+        architecture: arch(
+          "**Input** is **signal + control modality**: time-aligned **measurements** (and **duty/commands**) fed into a **template-specific** interface; some formulations need **initial states**. Unlike a generic RNN, the **input ports** are tied to **defined physical variables** in the PANN structure (state, input, output of the **average/switching** model).",
+          "**Hidden** “layers” are **state updates** prescribed by **converter physics** (averaged, switched, or hybrid), with **trainable** parameters inside—**not** free **LSTM** gates. The **invariant** is **consistency with assumed dynamics**: the representation **propagates** like the **true system** up to learnable **R, L, C**, etc. Wrong **template** breaks this before **loss** choice matters.",
+          "**Output** heads read **predicted waveforms**, **internal states**, or **identified parameters**. **Loss** is **MSE** (or **Huber**) against **measured** traces—**supervised** **regression** of time series—plus optional **L2** on parameters. The **task** is **identification** or **simulation matching**, not softmax classification."
+        ),
         tuning: "Physics fidelity vs. expressiveness trade-off.",
         caseStudy: "Paper §VII parameter identification with PANN-style inverse training.",
         paper: "PANN section + case study figures.",
@@ -572,7 +629,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Seq2Seq RNN / causal Transformer",
-        intro: "Maps input trajectories to output trajectories preserving temporal structure.",
+        intro:
+          "**Input trajectory** (e.g. reference command, grid disturbance) maps to **output trajectory** (current, voltage) with **shared** or **autoregressive** decoding so time alignment is explicit.",
+        architecture: arch(
+          "**Input** is **signal → signal**: **source** sequence **(T_in × C)** (e.g. reference, disturbance). **Modality interface:** both ends are **ordered** along time or frequency; **channels** are **physically defined** measurements or references.",
+          "**Hidden** **encoder** (**RNN/1D CNN/Transformer**) builds a **context** over the **input** invariant to **naive permutation** (it respects **order**). **Decoder** is **autoregressive** (**RNN** with previous output) or **cross-attention** to encoder states, with **causal** masks for **generation**. Invariants: **local smoothness**, **causality**, and often **multi-scale** transients inside slower envelopes.",
+          "**Output** is a **linear** projection **per step** to **target** **(T_out × C')**. **Loss:** **MSE/MAE** per step for **regression** of trajectories (**supervised seq2seq**); **CE** if each step is a **class**. **Scheduled sampling** bridges train/inference **exposure bias**—still tied to **predicting** a **known** target sequence."
+        ),
         tuning: "Teacher forcing, attention masks, sequence lengths.",
         caseStudy: "Dataset III in tutorial; **time_series_modeling.ipynb**.",
         paper: PAPER.signal_window,
@@ -581,7 +644,13 @@ const MODEL_PAIRS = {
       },
       {
         name: "PANN",
-        intro: "Physics-in-architecture for consistent waveforms with trainable physical parameters.",
+        intro:
+          "Seq2seq **waveform → waveform** (or identification) with **embedded** switching/averaged dynamics and **learnable** physical parameters—use when a template matches your converter class.",
+        architecture: arch(
+          "**Input/output** are **aligned waveform channels** on the **signal modality**; the **graph** of computations is fixed by the **PANN template** (which converter class you assumed). **Interface:** each sample is a **time series** with **defined** channel semantics (node voltages, inductor currents, etc.).",
+          "**Hidden** dynamics are **physics-structured state equations** with **learnable** parameters—not a generic **LSTM**. **Invariants:** **conservation** and **switching/averaging** assumptions baked into the **recurrence**; capacity to **fit** data is limited by **correctness** of that structure.",
+          "**Output** heads emit **waveforms** or **parameter** estimates. **Loss** = **MSE** vs. **measured** channels (**supervised** **trajectory regression**). The **learning task** is **match experiment** under **hard** physics **constraints** in the **hidden** update."
+        ),
         tuning: "See PANN README for architecture constraints.",
         caseStudy: "Tutorial PANN identification case.",
         paper: "PANN fundamentals in review.",
@@ -597,7 +666,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Temporal GNN / encoder + graph decoder",
-        intro: "Condition graph generation on waveform features (e.g., synthesized topology).",
+        intro:
+          "**Waveform encoder** produces a **latent** used to **condition** a **graph decoder** (autoregressive edge/node additions or one-shot adjacency logits)—for “given spectrum, suggest topology” style tasks.",
+        architecture: arch(
+          "**Input** fuses **signal modality** (windowed **1D** waveform/spectrum) through a **temporal encoder** into vector **z**, optionally concatenated with **tabular** context. **z** **interfaces** to a **graph decoder**—the **modality shift** is explicit: **continuous time series** → **discrete structure** logits.",
+          "**Hidden:** **1D CNN/LSTM** respects **sequential invariants** (locality, causality) in **z**; **decoder** (**autoregressive RNN** over **edges/nodes** or **masked** matrix logits) builds **relational** structure; optional **GNN** refines a **partial** graph, encoding **connectivity** invariants.",
+          "**Output:** **probabilities** over **next edge/node** or **adjacency** entries. **Loss:** **BCE/CE** on **supervised** graph elements (**supervised structure learning**) + **validity** penalties—linking **loss** to **feasible topology**. Research setups may add **GAN**/**VAE** terms; core task remains **matching** a **target** graph or **distribution**."
+        ),
         tuning: "Temporal windowing + graph size constraints.",
         caseStudy: "Conceptual in selector doc; repo gap for full demo—see **Graph_NN/README** for GNN stack references.",
         paper: "Graph data + signal sections.",
@@ -613,7 +688,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "PINN / hybrid CNN–RNN",
-        intro: "Couple measured excitations to field quantities with physics residuals where applicable.",
+        intro:
+          "**Time series** (excitation, duty, load) conditions a **field** predictor; **PINN** adds **spatial PDE** residuals, while **CNN–RNN** stacks treat the problem as **latent dynamics** + **spatial decoder**.",
+        architecture: arch(
+          "**Input** couples **signal** (time series of excitations, duties, loads) and/or **tabular** context with **field modality** (**grid** or **(x,y,t)** samples). **Interface:** **time** is **ordered**; **space** is **structured** on a mesh or grid—two **different** modality axes that must be **registered** (same timestep ↔ field snapshot).",
+          "**Hidden:** **RNN/1D CNN** on **time** yields **latent** **h_t** that **modulates** a **2D conv** decoder (**FiLM**/broadcast)—**invariant**: **temporal** evolution drives **spatial** patterns; **PINN** path uses an **MLP** on **(x,y,t)** to **couple** **PDE** structure across **space–time**.",
+          "**Output:** **field tensor** per time or **steady** map. **Loss:** **MSE** on **probes/pixels** (**supervised field regression**) + optional **λ**·**PDE residual**; **weighted sum** balances **data fit** vs. **physics**. **Task:** predict **fields** driven by **time-varying inputs**."
+        ),
         tuning: "Multi-physics loss weights.",
         caseStudy: "Magnetic + PINN tutorials complementary.",
         paper: PAPER.piml_loss,
@@ -629,7 +710,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Modular temporal–tabular fusion",
-        intro: "Encode waveforms and tabular/context features separately, then fuse.",
+        intro:
+          "**Two (or more) encoders:** one for **scope data**, one for **static context** (rating, command, temperature bin); **fusion** then **multi-task** heads—same pattern as hybrid DAB workflows.",
+        architecture: arch(
+          "**Input** has two **native** interfaces: **tabular** vector (setpoints, ratings) → **MLP** first layer; **signal** **(T×C)** → **1D CNN/LSTM** first layers. **Modalities** stay **separate** until **fusion**—avoid flattening the **sequence** into arbitrary **columns** without **encoder** structure.",
+          "**Hidden:** parallel encoders produce **z_tab**, **z_seq**; **concat** or **cross-attention** (tabular **queries** **waveform tokens**) **fuses** them—**invariant**: model learns **when** static context vs. **dynamic** waveform drives the decision; **asymmetric dropout** can **regularize** dominant modality.",
+          "**Output** heads: **linear** regression or **softmax**. **Loss:** **MSE/CE** on the **task**; **multi-task** sums **L_i** with learned or fixed **weights** (**uncertainty weighting**). **Task:** **joint** prediction from **static + temporal** evidence."
+        ),
         tuning: "Asymmetric dropout per branch; attention fusion.",
         caseStudy: "**one_stop_AI_DAB_modulation.ipynb**.",
         paper: PAPER.nn_practice,
@@ -645,7 +732,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Graph convolution / attention networks",
-        intro: "Exploit connectivity—paper discusses EMI/layout modeling vs. naive categorical encoding.",
+        intro:
+          "**Graph-level** or **node-level** prediction: **message passing** aggregates neighbor features so the model sees **loops, parasitics paths, and layout** rather than a single categorical “layout ID”.",
+        architecture: arch(
+          "**Input layer** ingests **graph modality**: **node feature matrix** **X**, **edge index** or **adjacency**, optional **edge features**—each row of **X** is a **device/pad** with **physical attributes** (type, rating, sensor). The **interface** is **relational**: the model **indexes neighbors** through **edges**, not a fixed **grid**.",
+          "**Hidden:** **K** **message-passing** layers (**GCN/SAGE/GAT**) **aggregate** neighborhood information—this **encodes invariants** of **connectivity**, **local coupling**, and **multi-hop** influence (tutorial graph section). **Residual** links mitigate **over-smoothing**. **Readout** (**sum/mean/max** or **attention pool**) maps **variable-size** graphs to a **fixed vector** while **permutation** of node IDs is handled by **equivariant** ops + **invariant** pooling.",
+          "**Output:** **softmax** (**graph classification**), **sigmoids** (**multi-label** faults), or **linear** (**regression** of KPI). **Loss** matches the **task**: **CE** for **exclusive** classes, **BCE** for **co-occurring** faults, **MSE** for **scalar** targets—each compares **head outputs** to **labels** for **supervised** learning on **graphs**."
+        ),
         tuning: "Depth, over-smoothing mitigation, batching of graphs.",
         caseStudy: "Conceptual; **no GNN training notebook** in repo—use **Graph_NN/README** for surveys + external PyG/DGL.",
         paper: PAPER.graph_invariants,
@@ -661,7 +754,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Temporal GNN",
-        intro: "Graph structure with time-varying node features.",
+        intro:
+          "Each **time step** (or window) has a **graph** with **time-varying node features**—combine **GNN** with **RNN** over time or use **spatio-temporal** message passing.",
+        architecture: arch(
+          "**Input** is a **time series of graphs**: each **G_t** carries **node features** **X_t**—**modalities** are **graph** (topology may be **fixed** or **slowly changing**) plus **time** **index** **t**.",
+          "**Hidden:** **Option A:** **GNN** at each **t** → **sequence model** (**LSTM**) on **pooled** or **per-node** traces—**invariants**: **spatial** coupling via **GNN**, **temporal** dependence via **RNN**. **Option B:** **spatio-temporal GNN** layers couple **neighbors across time** in one stack.",
+          "**Output:** **labels** per window, **per-node** **forecasts**, or **next-step** **graph** attributes. **Loss:** **MSE** for **continuous** **trajectories**; **CE** for **discrete** **events**—**task** is **supervised prediction** on **spatio-temporal** PE data."
+        ),
         tuning: "Window length, message-passing steps.",
         caseStudy: "Research frontier; pair with **rnn_basics** concepts.",
         paper: "Signal + graph sections.",
@@ -677,7 +776,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "GNN autoencoder / iterative editors",
-        intro: "Encode topology, decode modified graph for co-design.",
+        intro:
+          "**Encoder** maps graph → **latent**; **decoder** proposes **edited** graph (refinement, rewiring, component swap) for **co-design** or **what-if** exploration.",
+        architecture: arch(
+          "**Input** is **graph modality** **G** (and optional **noise** / **conditioning** vector for **VAE** variants). **Interface:** **node/edge** tensors the same as **classification** GNNs, but the **target** is another **graph** or **edit sequence**.",
+          "**Encoder:** **GNN** → **latent** **z** (**invariant** pooling). **Decoder:** **MLP** on **z** emits **edge/node logits**, or **autoregressive** **RNN** emits **one edit** at a time—**hidden** structure must **respect** **feasibility** (often via **masking** illegal edges).",
+          "**Output:** **distribution** over **graphs** or **deterministic** **refined** **G'**. **Loss:** **BCE/CE** vs. **target** **adjacency** (**supervised** **reconstruction** / **matching**) + **validity** terms; **RL** uses **reward** instead of **fixed** labels when **searching** **topologies**."
+        ),
         tuning: "Validity constraints on generated graphs.",
         caseStudy: "Not covered by local `.ipynb` — use **Graph_NN/README** for pointers; external graph-to-graph libraries.",
         paper: PAPER.graph_invariants,
@@ -693,7 +798,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Hybrid GNN + field network",
-        intro: "Combine relational encoder with grid or mesh-based field head.",
+        intro:
+          "**GNN** summarizes **layout/topology**; a **CNN (or PINN) head** predicts **field** on a grid **conditioned** on that embedding—links **relational** and **spatial** views.",
+        architecture: arch(
+          "**Input** couples **graph modality** ( **GNN** on layout ) with **field modality** (**grid** or **(x,y)** samples). **g** is a **global layout embedding**; **coordinates** are **local** **spatial** inputs—**interface** links **relational** structure to **spatial** **maps**.",
+          "**Hidden:** **GNN** → **g** **modulates** **2D conv** (**FiLM**/broadcast) so **field** patterns **depend** on **topology** **invariant** captured in **g**; **PINN** path **concat**s **g** to **(x,y)** **MLP** inputs to **embed** **layout** in **u(x,y)**.",
+          "**Output:** **field** **u** on **grid**. **Loss:** **MSE** on **measured** **field/sensor** (**supervised**) + optional **λPDE** + **consistency** if **multi-task** ties **graph** **predictions** to **field** **behavior**."
+        ),
         tuning: "Coupling losses between graph embedding and field supervision.",
         caseStudy: "Use PINN notebooks for field half.",
         paper: "Field + graph discussion.",
@@ -709,7 +820,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Fusion architectures",
-        intro: "Branches for graph and other modalities with gated fusion.",
+        intro:
+          "**Parallel encoders** (graph + tabular/signal/field) → **gated** or **attentive** fusion so the model learns **when** to trust topology vs. measurements.",
+        architecture: arch(
+          "**Input:** **parallel** **interfaces**—**graph** → **GNN** first layer; **tabular/signal/field** → **MLP/CNN/RNN** first layers. **Modalities** are **not** raw-concatenated at **pixels** and **adjacency** without **encoding**.",
+          "**Hidden:** **pooled** **graph** vector **g** and **other** embedding **h** **fuse** via **gating** or **cross-attention**—**invariant**: learn **importance** of **topology** vs. **measurements** per **regime**.",
+          "**Output:** **shared** **task** **head(s)**. **Loss:** **primary** **supervised** **L_task** + **auxiliary** **L_branch** to stop **unused** **encoder** **collapse**—**overall** **task** still **defined** by **labels**."
+        ),
         tuning: "Balance capacity across branches.",
         caseStudy: "**DAB one-stop** for fusion patterns (partial).",
         paper: PAPER.nn_practice,
@@ -725,7 +842,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "CNN / Vision Transformer encoder + MLP head",
-        intro: "Downsample field maps to embedding vector for regression/classification.",
+        intro:
+          "**Field snapshots** (flux, temperature) as **images**: **2D CNN** or **ViT** patch encoder → **pooled embedding** → **scalar/vector** targets (peak T, loss density integral, class).",
+        architecture: arch(
+          "**Input** is **unstructured / image-like** **field modality**: tensor **(C×H×W)**—**thermal**, **IR**, **rasterized** **PCB**; **channels** carry **physics** **quantities** or **RGB**; **normalize** per **channel** with **consistent** **units**.",
+          "**Hidden:** **Conv** **backbone** or **ViT** **patches**—**invariants**: **local** **translation** **equivariance** (**CNN**) or **patch** **ordering** with **position** **encoding** (**ViT**). **Pooling** (**GAP**/**CLS**) **removes** **spatial** **indices** for a **global** **decision**.",
+          "**Output:** **linear** **regression** or **softmax** **classification**. **Loss:** **MSE**/**CE** vs. **labels**; **focal**/**weighted** **CE** for **rare** **fault** **visuals**. **Physics** checks (e.g. **energy**) usually **post** **network**, not **in** **loss**, unless you **encode** them as **extra** **terms**."
+        ),
         tuning: "Augment with physics-based normalization where possible.",
         caseStudy: "**magnet_fnn.ipynb**, **magnet_lstm.ipynb**.",
         paper: "Field data section.",
@@ -741,7 +864,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "CNN encoder + RNN decoder",
-        intro: "Predict time series from spatial field snapshots or vice versa.",
+        intro:
+          "**Spatial encoder** compresses each **field frame**; **RNN** models **temporal evolution** (or the reverse: **RNN** conditions **spatial** generation)—for **thermal/EMI** dynamics tied to fields.",
+        architecture: arch(
+          "**Input** is **field** **time series**: **F_t** **(C×H×W)**—**modalities** **field** + **time**; **interface** is **CNN** **per** **frame** to **vector** **z_t** (same **spatial** **encoding** each **step**).",
+          "**Hidden:** **LSTM/GRU** on **z_t** **captures** **temporal** **invariants** ( **slow** **thermal** **dynamics** ); **decoder** **RNN** → **CNN** **reconstructs** **fields** when **seq2field**.",
+          "**Output:** **per-time** **scalars** or **field** **sequence**. **Loss:** **MSE** vs. **targets**; **autoregressive** **training** may use **teacher forcing**—**task** is **supervised** **forecasting** or **regression** from **thermal**/**IR** **movies**."
+        ),
         tuning: "Temporal alignment, downsampling of fields for speed.",
         caseStudy: "Partial overlap with magnetic sequence notebooks.",
         paper: "Tutorial field/signal narrative.",
@@ -757,7 +886,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Hybrid CNN–GNN",
-        intro: "Use field maps to infer connectivity or layout graphs.",
+        intro:
+          "**CNN** reads **field patterns**; **GNN head** predicts **graph structure** (connectivity, net grouping)—research-style **inverse** layout inference.",
+        architecture: arch(
+          "**Input** is **field modality** **(C×H×W)**; **first** **interface** is **CNN** **encoder** → **vector** or **map** **pooled** to **fixed** **dim**—**topology** is **not** given; **network** **infers** **graph** **structure** from **spatial** **patterns**.",
+          "**Hidden:** **MLP** or **iterative** **GNN** **refinement** on **candidate** **graphs**—**invariants**: **local** **spatial** **features** **map** to **pairwise** **compatibility** (**edge logits**).",
+          "**Output:** **edge**/**node** **logits** → **probabilistic** **adjacency**. **Loss:** **BCE** vs. **known** **edges** (**supervised** **graph** **from** **image**) + optional **MSE** **field** **reconstruction** (**multi-task**)."
+        ),
         tuning: "Multi-task loss between field reconstruction and graph supervision.",
         caseStudy: "No local end-to-end notebook.",
         paper: "Cross-reference graph + field subsections.",
@@ -773,7 +908,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "PINN / U-Net with physics",
-        intro: "Predict one field from another with PDE constraints.",
+        intro:
+          "**Field-to-field** mapping (e.g. heat source → temperature) with **U-Net** skip connections for **multi-scale** structure plus optional **PDE residual** on the prediction.",
+        architecture: arch(
+          "**Input** is **field** **conditioning** ( **source** **tensor** ) plus **continuous** **coordinates** **(x,y)** on **collocation** **grid**—**interface** **feeds** **both** **pixel** **values** (**U-Net**) or **(x,y,cond)** (**PINN** **MLP**).",
+          "**Hidden:** **U-Net** **skip** **connections** **preserve** **multi-scale** **spatial** **structure**; **PINN** **hidden** **layers** **approximate** **smooth** **u** **obeying** **PDE** **when** **loss** **includes** **derivatives**.",
+          "**Output:** **target** **field** **same** **resolution** or **u(x,y)** **samples**. **Loss:** **MSE** on **labeled** **points** + **λ**·**PDE**² + **boundary** **terms**—**task** is **supervised** **field** **fitting** **with** **physics** **constraints**."
+        ),
         tuning: "Boundary conditions in loss; weight scheduling.",
         caseStudy: "PINN notebooks + magnetic examples.",
         paper: PAPER.piml_loss,
@@ -789,7 +930,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Multi-modal fusion with field branch",
-        intro: "Combine gridded tensors with tabular/signal features.",
+        intro:
+          "**Field CNN** branch + **tabular/signal** encoders → **fusion** → KPI head—typical when both **spatial** loss/thermal maps and **operating-point** vectors exist.",
+        architecture: arch(
+          "**Input** **interfaces** **three** **modalities**: **field** → **CNN** **stem**; **tabular** → **MLP**; **sequence** → **RNN**/**1D** **CNN**—each **branch** **normalizes** **its** **own** **scale**.",
+          "**Hidden:** **branch** **embeddings** **fuse** via **concat**, **gating**, or **attention**—**invariant** **learned**: **which** **modality** **drives** **the** **fault** **signature** **per** **sample**.",
+          "**Output:** **regression** or **classification** **head**. **Loss:** **MSE**/**CE** on **labels**; **modality** **dropout** **regularizes** **small** **multimodal** **sets**—**task** remains **standard** **supervised** **learning**."
+        ),
         tuning: "Normalize each modality; check overfitting on small multimodal sets.",
         caseStudy: "**one_stop_AI_DAB_modulation.ipynb** (workflow analogies).",
         paper: PAPER.nn_practice,
@@ -805,7 +952,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Modular encoders + dense head",
-        intro: "Each modality processed by appropriate shallow/deep encoder; fused embeddings.",
+        intro:
+          "Same **hybrid** idea as tabular_hybrid but emphasized for **performance modeling** at system level: **one encoder per sensor/format**, then **dense** fusion and **heads**.",
+        architecture: arch(
+          "**Input:** **N** **modalities**, each **first** **layer** **specialized**: **MLP** (**tabular**), **1D** **CNN**/**RNN** (**signal**), **2D** **CNN** (**field**), **GNN** (**graph**).",
+          "**Hidden:** **modality** **embeddings** **concat** or **attend** as **tokens**—**invariant** **fusion** **weights** **relations** **between** **heterogeneous** **measurements**.",
+          "**Output:** **scalar** **regression** or **class** **logits**. **Loss:** **MSE**/**CE** **main** **task** + optional **SSL** **per** **encoder**—**auxiliary** **losses** **shape** **representations** **without** **replacing** **label** **objective**."
+        ),
         tuning: "Fusion dropout; imbalance across sensors.",
         caseStudy: "**buck_comprehensive_case_study.ipynb**, **one_stop_AI_DAB_modulation.ipynb**.",
         paper: PAPER.nn_practice,
@@ -821,7 +974,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Temporal + tabular fusion",
-        intro: "LSTM/1D CNN for sequences + MLP for static features.",
+        intro:
+          "**Sequence** encoder (**LSTM/1D CNN**) for waveforms + **MLP** for static **setpoints/conditions**; **fusion** before fault or RUL head.",
+        architecture: arch(
+          "**Input** **interfaces** **tabular** **x_tab** and **sequence** **x_seq** **(T×C)** **separately**—**time** **axis** **only** in **seq** **branch**; **alignment** **T** **must** **match** **labels**.",
+          "**Hidden:** **MLP** **tabular** **invariants** ( **cross-feature** **interactions** ); **LSTM/TCN** **temporal** **invariants** on **x_seq**; **concat** **fusion** **FC** **combines** **both** **representations**.",
+          "**Output:** **fault** **logits** or **RUL** **scalar**. **Loss:** **CE**/**MSE**; **missing** **modality** **mask** or **token** **prevents** **garbage** **gradients**—**task** **supervised** **on** **available** **modalities**."
+        ),
         tuning: "Time alignment; missing modality handling.",
         caseStudy: "**time_series_modeling.ipynb** + comprehensive studies.",
         paper: PAPER.signal_window,
@@ -837,7 +996,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Heterogeneous fusion with GNN",
-        intro: "Combine graph encodings with embeddings of other modalities.",
+        intro:
+          "**GNN** on **topology** + **MLP/CNN/RNN** on **non-graph** data → **joint embedding** for classification or regression on **hybrid** PE records.",
+        architecture: arch(
+          "**Input:** **batched** **graphs** (**PyG/DGL**) **plus** **parallel** **non-graph** **tensors**—**interface** **splits** **relational** **batching** from **dense** **tensor** **pipeline**.",
+          "**Hidden:** **GNN** → **g** **captures** **topology** **invariant**; **CNN/MLP** → **h**; **concat** **FC** **joint** **reasoning**.",
+          "**Output:** **task**-**specific** **head**. **Loss:** **MSE**/**CE**/etc. **vs.** **labels**—**batch** **construction** **is** **engineering**; **learning** **objective** **unchanged**."
+        ),
         tuning: "Graph batch size vs. memory.",
         caseStudy: "External implementations recommended.",
         paper: "Graph + hybrid discussion.",
@@ -853,7 +1018,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Multi-branch with field tensor",
-        intro: "2D/3D convolutions on fields + other encoders.",
+        intro:
+          "At least one branch is a **2D/3D conv** tower on **field data**; other branches handle **remaining modalities** before **fusion**—full **hybrid** PE representation.",
+        architecture: arch(
+          "**Input:** **field** **grid** **(C×H×W)** **or** **(C×D×H×W)** **plus** **other** **modalities**—each **enters** **its** **native** **encoder** **first**.",
+          "**Hidden:** **Conv** **tower** **extracts** **spatial**/**spatiotemporal** **invariants**; **parallel** **branches** **for** **tabular/signal/graph**; **fusion** **MLP** **merges** **embeddings**.",
+          "**Output:** **multi-head**: e.g. **efficiency** **(regression)** + **hotspot** **prob** **(sigmoid)**. **Loss:** **weighted** **Σ L_k**—each **head** **has** **MSE**/**BCE** **matching** **its** **target**; **weights** **encode** **business** **priority**."
+        ),
         tuning: "Resolution vs. batch size trade-offs.",
         caseStudy: "Magnetic + PINN pieces combine conceptually.",
         paper: PAPER.piml_loss,
@@ -869,7 +1040,13 @@ const MODEL_PAIRS = {
     algorithms: [
       {
         name: "Hierarchical fusion / mixture-of-experts (advanced)",
-        intro: "Multiple experts per modality with gating—only when data justify complexity.",
+        intro:
+          "**Experts** specialize on subsets of modalities or regimes; a **gating network** routes samples—use only when **ablations** show single-trunk models underfit.",
+        architecture: arch(
+          "**Input** **tokens**/**features** **routed** ( **soft** or **hard** ) to **E** **experts**—each **expert** **first** **layer** **matches** **its** **modality** (**CNN/RNN/GNN**).",
+          "**Hidden:** **gating** **network** **softmax** **weights** **experts**—**invariant**: **sparse** **specialization** **per** **regime**; **load-balancing** **loss** **forces** **use** **of** **all** **experts**.",
+          "**Output:** **head** on **mixed** **representation**. **Loss:** **L_task** + **λ L_balance**—**primary** **still** **supervised** **prediction**; **balance** **is** **regularization** **not** **the** **PE** **metric**."
+        ),
         tuning: "Strong regularization; per-modality pretraining.",
         caseStudy: "**buck_comprehensive_case_study.ipynb** as integrated example.",
         paper: "Ablation emphasis in NN good-practices section.",
@@ -899,7 +1076,12 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
     algorithms.push({
       name: "Deep RL (DDPG / SAC / DQN / parameterized)",
       intro:
-        "Policy search in high dimensions; reward design encodes PE objectives (transients vs. steady-state). Tutorial cites RL reviews for converters.",
+        "**Policy π(a|s)** (or **Q(s,a)** for DQN) is a **neural network**: **state** = measurements / estimates; **action** = modulation, duty, references. **Reward** encodes tracking, losses, constraints—often dominates performance more than minor algorithm tweaks.",
+      architecture: arch(
+        "**Input layer** is **state vector** **s** ( **voltages**, **currents**, **references**, **errors** )—same **normalization** as **supervised** **NN**; **interface** is **tabular** **→** **FC** **first** **weights**.",
+        "**Hidden:** **2–4** **FC** **layers** **learn** **nonlinear** **value**/**policy** **over** **state**—**invariants** are **implicit** **dynamics** **compressed** **into** **features** **(no** **explicit** **PDE** **unless** **you** **encode** **it** **in** **state** **or** **reward** **)**.",
+        "**Output:** **continuous** **action** **(tanh** **+** **scale**)** **or** **|A|** **Q** **values**/**logits**. **Loss:** **not** **label** **matching**—**policy** **gradient**/**Bellman** **MSE**/**entropy** **(SAC)** **optimize** **expected** **return** **from** **environment** **interaction**; **CE** **only** **if** **distilling** **teacher**."
+      ),
       tuning:
         "Reward shaping, exploration noise, target nets, experience replay; sim-to-real gap for PE hardware.",
       caseStudy: "Literature cases in paper’s RL discussion—not duplicated locally.",
@@ -942,6 +1124,11 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       name: "PSO & Differential Evolution (DE)",
       intro:
         "PSO uses particle velocities with cognitive/social terms; aligns with **continuous** design vectors. DE evolves populations via differential mutation.",
+      architecture: arch(
+        "The **input layer** is a population of candidate vectors in a **continuous tabular design space** (e.g., component values, control gains). The modality interface is direct numeric parameters plus objective/constraint evaluations from simulation or experiment.",
+        "The **hidden dynamics** are population-update operators rather than neural layers. Invariants are search-trajectory regularities: PSO preserves momentum/exploration via velocity updates; DE preserves differential directions through mutation-recombination, exposing useful local geometry of the objective surface.",
+        "The **output layer** is the next candidate population and current best solution. The optimization **loss/objective** is the task cost (with penalties for constraints), minimized iteratively. This ties directly to single- or multi-objective PE design search rather than supervised label fitting."
+      ),
       tuning: PAPER.mha_explore + " See **pso_hyp_tuning.ipynb** for inertia schedules.",
       caseStudy: "**buck_design_PSO.ipynb**; DAB modulation stress minimization in tutorial.",
       paper: PAPER.mha_stats,
@@ -953,6 +1140,11 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       name: "Simulated Annealing & Ant Colony Optimization",
       intro:
         "Discrete move operators suit combinatorial device/topology choices. **Note:** local repo emphasizes PSO/GA; SA/ACO are described in the paper but not implemented in bundled notebooks.",
+      architecture: arch(
+        "The **input layer** is a discrete candidate encoding (topology choices, integer part indices, switch states) and associated objective value. The modality interface is combinatorial: moves are defined over symbolic/integer design variables, not continuous vectors.",
+        "The **hidden mechanism** is transition logic. SA uses neighborhood proposals and temperature-governed acceptance; ACO uses pheromone memory plus heuristic desirability. These reveal invariants of combinatorial search: feasible move sets, exploitation of promising patterns, and controlled random exploration.",
+        "The **output layer** is an updated candidate (SA) or sampled route/solution set (ACO), with objective/penalty evaluation. The optimization **loss/objective** is the PE design cost under constraints; the learning task is discrete global search, not supervised prediction."
+      ),
       tuning: "Cooling schedules (SA), pheromone dynamics (ACO), discrete neighborhood definitions.",
       caseStudy: "Paper’s algorithm-selection table; PE converter discrete sizing examples in literature.",
       paper: PAPER.mha_explore,
@@ -967,6 +1159,11 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       name: "Genetic Algorithm (GA)",
       intro:
         "**Mixed continuous/discrete** chromosomes—crossover/mutation tailored per gene type; used in buck comprehensive study with database constraints.",
+      architecture: arch(
+        "The **input layer** is a population of chromosomes with mixed gene types (continuous, integer, categorical). The modality interface naturally matches hybrid PE design variables and database-indexed component options.",
+        "The **hidden process** is evolutionary transformation: selection, crossover, mutation, and elitism. Invariants appear as building blocks (useful gene combinations) that survive across generations while mutation keeps global exploration alive.",
+        "The **output layer** is the evolved next population and Pareto-best/elite individuals. The optimization **loss/objective** is the evaluated design objective(s) plus penalties; for multi-objective variants, dominance/crowding metrics guide updates to match the search task."
+      ),
       tuning: "Population size, crossover/mutation rates, elitism; mesh with **component databases** in case study.",
       caseStudy: "**buck_comprehensive_case_study.ipynb** GA vs. PSO narrative.",
       paper: "Hybrid space discussion + statistical testing.",
@@ -980,6 +1177,11 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       name: "NSGA-II / NSGA-III / MOSPO",
       intro:
         "**Non-dominated sorting** builds Pareto fronts; handles competing objectives (efficiency, ripple, volume).",
+      architecture: arch(
+        "The **input layer** is a population of candidate designs with vector-valued objective evaluations. The modality interface is multi-objective tabular design data: each sample carries decision variables and multiple performance metrics.",
+        "The **hidden ranking logic** is non-dominated sorting, crowding distance, and (for NSGA-III) reference-point association. These reveal invariants of Pareto structure: dominance tiers and diversity along the trade-off manifold.",
+        "The **output layer** is a Pareto-approximate population/front. The optimization **loss/objective** is not a single scalar label loss; selection minimizes dominance rank while maximizing spread/diversity, directly tied to multi-objective design-learning goals."
+      ),
       tuning: "Reference points (NSGA-III), crowding distance, population size; normalize objectives (paper warns on scale).",
       caseStudy: "**multi_obj_MHA_master.ipynb** Pareto evolution animations.",
       paper: "Multi-objective MHA subsection + NSA explanation.",
@@ -1009,7 +1211,43 @@ export function buildProcessRecommendation(kind) {
     summary: isSim
       ? "Scripted batching across tools: parameter sweeps (LHS/grid), parse outputs, build datasets feeding ML/MHA pipelines."
       : "LLM + **RAG** + **tools** for design automation: memory, planning (CoT/ReAct), multimodal waveform parsing—per paper’s PE-GPT discussion.",
-    algorithms: [],
+    algorithms: isSim
+      ? [
+          {
+            name: "Simulation automation pipeline (LHS/grid + parser + dataset builder)",
+            intro:
+              "Automates PE data generation by orchestrating simulator inputs, batch execution, and structured output parsing. This is a workflow algorithm rather than a neural architecture, but it still has clear input/processing/output contracts.",
+            architecture: arch(
+              "The **input layer** is the experiment specification: design-variable bounds, sampling policy (grid/LHS), simulator templates/netlists, and requested measurement channels. It interfaces tabular design modalities to tool-specific APIs (LTspice/PLECS/MATLAB scripting).",
+              "The **hidden processing layer** is orchestration logic: sample generation, job scheduling, run monitoring, retry/error handling, and waveform/metric parsers. The invariants are reproducibility, consistent schema across runs, and deterministic mapping from parameter sets to simulation artifacts.",
+              "The **output layer** is a cleaned dataset (features, labels, metadata) ready for modeling/optimization. The effective objective/loss is data quality and coverage: maximize valid samples and operating-space coverage while minimizing failed or inconsistent runs to support downstream supervised/RL tasks."
+            ),
+            tuning:
+              "Sampling density (LHS points), timeout/retry policy, parser validation rules, and data schema checks before model training.",
+            caseStudy: "PLECS and LTspice automation notebooks in the simulation automation section.",
+            paper: "Simulation batch-acquisition flow in the tutorial process-automation discussion.",
+            links: repoLinks([NB.ltspice, NB.plecs, NB.simReadme]),
+            external: [],
+          },
+        ]
+      : [
+          {
+            name: "Agentic AI workflow (LLM + memory + tools)",
+            intro:
+              "Runs a goal-directed design loop where an LLM plans actions, calls tools (simulation/parsers/code), and uses memory (RAG) to iteratively refine PE tasks.",
+            architecture: arch(
+              "The **input layer** is a multimodal task context: user goal, constraints, prior runs, retrieved references, and tool state. The interface unifies text prompts, structured config files, and simulation outputs into a prompt/context window plus retrieval store.",
+              "The **hidden reasoning layer** is planner-executor control: decomposition, tool selection, reflection, and memory updates (episodic/semantic/procedural). Invariants are consistency with constraints, traceable decision steps, and grounded actions through tool feedback rather than free-form text only.",
+              "The **output layer** is actionable artifacts: suggested designs, scripts, experiment plans, and report updates. The optimization objective is task success under constraints (accuracy, safety, runtime); when trained end-to-end, supervision can be instruction/reward-based, but in deployment this is usually an iterative closed-loop decision task."
+            ),
+            tuning:
+              "Retriever quality, tool-routing policies, guardrails, and evaluation on task success + hallucination rate + execution reliability.",
+            caseStudy: "PE-GPT style design-assistant workflow in the tutorial’s agentic AI section.",
+            paper: PAPER.agentic_stack,
+            links: repoLinks([NB.agentic]),
+            external: [{ label: "PE-GPT paper (IEEE TIE 2025)", href: "https://ieeexplore.ieee.org/document/10918566" }],
+          },
+        ],
     flags: { nn: false, mha: false, tinyml: false, piml: false },
     extras: { nn: !isSim, mha: false, tinyml: false, piml: false },
     scarceHtml: "",
@@ -1052,7 +1290,12 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Reinforcement learning control",
       intro:
-        "MDP formulation: converter or simulator as **environment**, policy as **actor**; reward encodes tracking, efficiency, constraints.",
+        "Same **actor–critic** / **DQN** picture as high-dimensional design RL but **states** and **actions** update at **control rate**; **safety filters** (limits, Lyapunov-style shields) often wrap the NN output for hardware.",
+      architecture: arch(
+        "**Input** is **observation** **vector** **(or** **short** **waveform** **→** **1D** **CNN** **stem**)** **from** **sensors**/**estimator**—**interface** **maps** **physical** **signals** **to** **fixed** **dim** **before** **control** **head**.",
+        "**Hidden:** **FC**/**CNN** **layers** **encode** **feasible** **control** **responses** **to** **state** **trajectories**—**invariants** **learned** **from** **reward** **shaping**, **not** **from** **static** **labels**.",
+        "**Output:** **continuous** **duty** **cycle**/**reference** **or** **discrete** **switching**. **Loss:** **RL** **objective** **(PG**/**soft** **Q**)**; **optional** **BC** **MSE** **pretrain** **from** **expert** **trajectories** **then** **fine-tune** **with** **RL**."
+      ),
       tuning: "Reward engineering dominates; exploration strategies; safety filters for hardware.",
       caseStudy: "Tutorial cites RL control surveys; repo README points to external implementations.",
       paper: "RL control subsection.",
@@ -1063,7 +1306,12 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Imitation / surrogate control (NN)",
       intro:
-        "Offline-train NN to mimic MPC or legacy controller; deploy with low latency—ties to **Modeling** paths for training data.",
+        "**Supervised** learning: **state** (or error vector) → **control action** that matches **teacher** (MPC, PID bank). **Shallow-wide** MLPs often preferred for **latency** on MCUs (tutorial TinyML narrative).",
+      architecture: arch(
+        "**Input** **matches** **teacher** **features** **(references**, **states**, **limits**)**—**tabular** **interface** **identical** **to** **classical** **controller** **inputs**.",
+        "**Hidden:** **shallow** **wide** **FC** **for** **MCU** **latency**—**invariants** **are** **smooth** **mappings** **from** **state** **to** **action** **imitated** **from** **demos**.",
+        "**Output:** **linear** **head** **→** **action** **vector**. **Loss:** **MSE**/**Huber** **‖a_student** **−** **a_teacher**‖**—** **pure** **supervised** **imitation**; **optional** **KL**/**T** **for** **soft** **teacher**; **rate/sat** **in** **loss** **or** **post** **clamp**."
+      ),
       tuning: "Distillation temperature, dataset coverage of operating points.",
       caseStudy: "Tutorial imitation/MPC surrogate references.",
       paper: "Control section + TinyML deployment discussion.",
@@ -1076,7 +1324,12 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "TinyML deployment stack",
       intro:
-        "Quantization (FP32→INT8), pruning with **L1**, shallow-wide MLPs, ONNX Runtime/TFLite; matches **adaptive modulation** case.",
+        "Not a new **topology**—**compress** the deployed **actor/imitation** net: **INT8** weights, **pruning**, **operator fusion** in **ONNX Runtime** / **TFLite**; keep **shallow-wide** for deterministic cycle time.",
+      architecture: arch(
+        "**Input/output** **topology** **unchanged** **from** **FP32** **student**—**quantization** **is** **weight**/**activation** **discretization**, **not** **new** **modality** **interface**.",
+        "**Hidden:** **INT8** **matmul** **approximates** **same** **FC**/**Conv** **maps**—**invariant** **structure** **preserved** **under** **bounded** **error** **if** **calibrated** **well**.",
+        "**Loss:** **during** **QAT** **matches** **full** **precision** **task** **(MSE**/**CE**/**RL** **surrogate**)**; **PTQ** **uses** **calibration** **batch** **only** **for** **scale**—**deployment** **metric** **is** **latency**/**power**, **learned** **via** **same** **objective** **as** **before** **compression**."
+      ),
       tuning: PAPER.tinyml,
       caseStudy: "**TinyML.ipynb** DAB online adapter; paper §VII TinyML + ONNX 5× speedup.",
       paper: PAPER.tinyml,
@@ -1102,20 +1355,76 @@ export function buildControlRecommendation(policy, deploy) {
 }
 
 export function buildUnsupervisedFDDRecommendation(modality) {
+  const variant =
+    modality === "signal"
+      ? {
+          name: "Signal anomaly models (1D autoencoder / Deep SVDD / OCSVM on features)",
+          intro:
+            "Train on **normal waveforms or spectra** only; detect abnormal switching, resonance, or degradation by reconstruction error, latent-distance, or classical one-class boundaries on harmonic/statistical features.",
+          architecture: arch(
+            "The **input layer** interfaces **signal modality** as windows **(channels x length)** or frequency-domain spectra. You may either feed raw traces into a **1D CNN/LSTM encoder** or first compute harmonics/statistics for classical one-class models.",
+            "The **hidden representation** is a compact latent code **z** from a temporal encoder, or an implicit kernel/tree partition in OCSVM/Isolation-style baselines. The invariant being learned is the manifold of **normal temporal behavior**: periodicity, transients, and expected waveform morphology.",
+            "The **output layer** is an anomaly score from reconstruction error, hypersphere distance, or decision function. **Loss/objective** is unsupervised: reconstruction **MSE** or one-class compactness on normal-only data, then thresholding maps scores to anomaly alarms."
+          ),
+          tuning: "Window length, alignment to switching period, bottleneck size, contamination rate, and threshold calibration on validation anomalies if available.",
+          caseStudy: "**one_stop_AI_DAB_modulation.ipynb** anomaly-oriented workflows and waveform feature analysis.",
+          links: repoLinks([NB.dabOne, NB.rnn]),
+        }
+      : modality === "graph"
+        ? {
+            name: "Graph anomaly models (graph autoencoder / one-class GNN)",
+            intro:
+              "Use **graph-structured normal data** to learn typical connectivity and node-feature behavior; flag layouts/topologies/thermal networks whose embeddings or reconstructions deviate from the healthy relational manifold.",
+            architecture: arch(
+              "The **input layer** interfaces **graph modality** through node features, edge features, and connectivity. This preserves relational structure for circuits, thermal graphs, or topological monitoring networks.",
+              "The **hidden stack** is a **GNN encoder** with pooling or graph-autoencoder decoder. It reveals invariants of **normal connectivity**, local coupling, and multi-hop propagation patterns rather than only scalar thresholds.",
+              "The **output layer** is an anomaly score from graph reconstruction error, latent distance to a normal center, or one-class decision value. **Loss/objective** is unsupervised graph reconstruction or compactness on healthy graphs, then thresholding creates anomaly decisions."
+            ),
+            tuning: "Pooling choice, graph depth vs. over-smoothing, negative-edge sampling for reconstruction, and alert-threshold calibration.",
+            caseStudy: "Graph-specific FDD is tutorial-aligned but course materials mainly point to **Graph_NN/README.md** and external GNN tooling.",
+            links: repoLinks([NB.graphNN, "4_Neural_Network/README.md"], ["Graph_NN/README.md", "4_Neural_Network/README.md"]),
+          }
+        : modality === "unstructured"
+          ? {
+              name: "Unstructured anomaly models (CNN autoencoder / one-class vision)",
+              intro:
+                "Learn the appearance of **normal images or thermal maps** and flag visually abnormal samples through reconstruction, feature-distance, or one-class classification in latent space.",
+              architecture: arch(
+                "The **input layer** interfaces **unstructured modality** as image tensors, typically thermal frames or IR/rasterized inspection views with consistent normalization and camera preprocessing.",
+                "The **hidden backbone** is a **CNN encoder** or convolutional autoencoder that captures invariants of normal hotspot geometry, texture, and spatial morphology. The latent space represents what healthy visual structure should look like.",
+                "The **output layer** is either a reconstructed image or an anomaly score from latent distance / one-class head. **Loss/objective** is reconstruction **MSE/L1** or one-class compactness on normal-only images, with thresholding used for detection."
+              ),
+              tuning: "Augmentation policy, bottleneck width, camera-domain consistency, and threshold selection under class imbalance.",
+              caseStudy: "Tutorial unstructured-data discussion and thermal-imaging diagnostic references.",
+              links: repoLinks([NB.nnBasics]),
+            }
+          : {
+              name: "Tabular anomaly models (Isolation Forest / OCSVM / deep SVDD)",
+              intro:
+                "Train on **normal operating features** only; detect abnormal points using tree isolation, kernel boundaries, Gaussian mixtures, or deep one-class embeddings.",
+              architecture: arch(
+                "The **input layer** interfaces **tabular modality** as a fixed-order vector of engineered statistics, operating conditions, or harmonic indicators, with explicit scaling and schema control.",
+                "The **hidden mechanism** is either implicit partitions/kernels (Isolation Forest, OCSVM, GMM) or a compact deep embedding **z** from an MLP encoder. The invariant is the geometry of **healthy operating regions** in feature space.",
+                "The **output layer** is an anomaly score such as path length, density likelihood, or distance to a learned center. **Loss/objective** is unsupervised density/one-class fitting on normal-only samples, then thresholding yields anomaly alarms."
+              ),
+              tuning: "Contamination rate, kernel scale, feature scaling, and threshold selection using held-out healthy/anomalous windows where possible.",
+              caseStudy: "DAB **Isolation Forest / One-Class SVM** examples in **one_stop_AI_DAB_modulation.ipynb**.",
+              links: repoLinks([NB.dabOne, NB.ensemble, NB.classic]),
+            };
   return {
     pathId: null,
     title: `Maintenance — Unsupervised anomaly detection (${modality})`,
     summary:
-      "Train on **normal** operation only; flag deviations—Isolation Forest, one-class SVM, GMM, clustering + t-SNE visualization per tutorial.",
+      "Train on **normal** operation only; flag deviations using modality-appropriate one-class or reconstruction models, with EDA and threshold calibration following the tutorial.",
     algorithms: [
       {
-        name: "Isolation Forest / One-Class SVM / deep SVDD-style models",
-        intro:
-          "Learn boundary of normal class; common when fault labels are rare. Tutorial NPC-DAB hybrid example cites isolation forest / one-class SVM.",
-        tuning: "Contamination rate, kernel scale (OCSVM), feature scaling.",
-        caseStudy: "**one_stop_AI_DAB_modulation.ipynb** anomaly sections.",
+        name: variant.name,
+        intro: variant.intro,
+        architecture: variant.architecture,
+        tuning: variant.tuning,
+        caseStudy: variant.caseStudy,
         paper: "Unsupervised subsection + EDA with t-SNE.",
-        links: repoLinks([NB.dabOne, NB.ensemble]),
+        links: variant.links,
         external: [{ label: "scikit-learn IsolationForest", href: "https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.IsolationForest.html" }],
       },
     ],
@@ -1127,20 +1436,69 @@ export function buildUnsupervisedFDDRecommendation(modality) {
   };
 }
 
-export function buildSSLFDDRecommendation() {
+export function buildSSLFDDRecommendation(modality) {
+  const variant =
+    modality === "signal"
+      ? {
+          name: "Semi-supervised sequence classifiers",
+          intro:
+            "Use a **shared temporal encoder** for labeled and unlabeled waveforms, then regularize predictions under augmentations or teacher-student consistency so sequence structure is learned even when fault labels are scarce.",
+          architecture: arch(
+            "The **input layer** interfaces **signal modality** as waveform/spectrum windows for both labeled and unlabeled batches. Augmentations should preserve PE semantics, such as small noise, masking, or mild time-domain perturbations without destroying causality.",
+            "The **hidden stack** is a shared **1D CNN/LSTM/Transformer** encoder producing latent **z**. It reveals invariants of temporal locality, causal trends, and periodic structure by forcing consistent embeddings/predictions across perturbations and pseudo-labeled views.",
+            "The **output layer** is a supervised classification head plus optional projection/teacher heads. **Loss** combines labeled **CE/BCE** with consistency, pseudo-label, or contrastive objectives, matching the semi-supervised sequence FDD task."
+          ),
+          links: repoLinks([NB.rnn, NB.dabOne]),
+        }
+      : modality === "graph"
+        ? {
+            name: "Semi-supervised graph classifiers",
+            intro:
+              "Use a **GNN encoder** with few labeled graphs and many unlabeled ones; propagate relational structure through consistency regularization, pseudo-labeling, or graph contrastive objectives.",
+          architecture: arch(
+            "The **input layer** interfaces **graph modality** through node/edge features and connectivity for both labeled and unlabeled graphs, preserving topology across the SSL pipeline.",
+            "The **hidden stack** is a shared **GNN** encoder with graph pooling or node-level readout. It reveals invariants of connectivity and multi-hop relational patterns by keeping graph embeddings stable under graph augmentations or teacher-student agreement.",
+            "The **output layer** is a classification head on labeled graphs plus optional projection heads for contrastive/consistency learning. **Loss** combines supervised **CE/BCE** with graph-consistency or contrastive terms, directly matching semi-supervised graph FDD."
+          ),
+          links: repoLinks([NB.graphNN, "4_Neural_Network/README.md"], ["Graph_NN/README.md", "4_Neural_Network/README.md"]),
+        }
+      : modality === "unstructured"
+        ? {
+            name: "Semi-supervised vision classifiers",
+            intro:
+              "Use a CNN or ViT backbone with few labeled thermal/visual fault images and many unlabeled ones, regularizing predictions across augmentations or pseudo-labeled teacher outputs.",
+            architecture: arch(
+              "The **input layer** interfaces **unstructured modality** as normalized images for both labeled and unlabeled sets. Augmentations should preserve diagnostic content, avoiding transforms that erase hotspot or morphology information.",
+              "The **hidden backbone** is a shared **CNN/ViT** encoder that reveals invariants of texture, hotspot shape, and spatial pattern by enforcing agreement across multiple views of the same healthy/fault image.",
+              "The **output layer** is a classification head with optional projection/teacher branches. **Loss** combines labeled **CE/BCE** with consistency or pseudo-label terms, which fits semi-supervised visual FDD."
+            ),
+            links: repoLinks([NB.nnBasics]),
+        }
+      : {
+          name: "Semi-supervised tabular classifiers",
+          intro:
+            "Use an MLP or shallow classical-to-neural pipeline with few labeled operating points and many unlabeled ones; regularize the decision surface so nearby healthy/fault points remain consistent under perturbation.",
+          architecture: arch(
+            "The **input layer** interfaces **tabular modality** as fixed-order feature vectors for labeled and unlabeled samples, with careful scaling and feature-schema alignment.",
+            "The **hidden stack** is a shared **MLP** encoder or embedding layer producing latent **z**. It reveals invariants of class neighborhoods and smooth decision boundaries by forcing agreement under feature perturbations or pseudo-label updates.",
+            "The **output layer** is a supervised classifier head plus optional projection/teacher branch. **Loss** combines labeled **CE/BCE** with consistency, pseudo-label, or contrastive terms to match semi-supervised tabular FDD."
+          ),
+          links: repoLinks([NB.nnBasics, NB.dabOne]),
+        };
   return {
     pathId: null,
-    title: "Maintenance — Semi-supervised FDD",
+    title: `Maintenance — Semi-supervised FDD (${modality})`,
     summary:
-      "Combine few labels with many unlabeled samples—graph-based SSL (paper cites PV example), consistency regularization, pseudo-labeling.",
+      "Combine few labels with many unlabeled samples using modality-specific encoders, consistency regularization, pseudo-labeling, or contrastive objectives.",
     algorithms: [
       {
-        name: "Semi-supervised classifiers",
-        intro: "Extend supervised encoders with unsupervised losses on unlabeled batch.",
+        name: variant.name,
+        intro: variant.intro,
+        architecture: variant.architecture,
         tuning: "Weight between losses; avoid confirmation bias.",
         caseStudy: "Paper cites SSL for FDD when labeling is costly.",
         paper: "Semi-supervised learning paragraph.",
-        links: repoLinks([NB.nnBasics, NB.dabOne]),
+        links: variant.links,
         external: [{ label: "FixMatch (reference architecture)", href: "https://arxiv.org/abs/2001.07685" }],
       },
     ],
@@ -1161,13 +1519,18 @@ export function buildFDDRecommendation(task, modality) {
     return buildUnsupervisedFDDRecommendation(modality);
   }
   if (task === "ssl") {
-    return buildSSLFDDRecommendation();
+    return buildSSLFDDRecommendation(modality);
   }
 
   if (modality === "tabular") {
     algos.push({
       name: "Classic ML & ensembles",
       intro: "SVM, kNN, logistic regression, **decision trees**, **XGBoost** for labeled tabular FDD.",
+      architecture: arch(
+        "The **input layer** is a fixed-order tabular feature vector per sample/window (engineered stats, harmonics, operating conditions). The modality interface is column-based and rotation-variant, so feature order and scaling are controlled explicitly.",
+        "The **hidden mechanism** depends on model family: margins/kernels (SVM), neighborhood geometry (kNN), linear log-odds interactions (logistic), or tree partitions (ensembles). These capture invariants of separability and feature-threshold interactions in fault space.",
+        "The **output layer** is class probability/logit (binary or multiclass) or multi-label logits when configured. **Loss/objective** aligns to supervised FDD: cross-entropy/logistic loss for labels, with class weighting for imbalance; predictions map directly to health-state classification tasks."
+      ),
       tuning: "Class imbalance, calibration, feature scaling; anomaly: train only on normal data.",
       caseStudy: "DAB **Isolation Forest / One-Class SVM** in **one_stop_AI_DAB_modulation.ipynb**.",
       paper: "FDD + unsupervised subsection.",
@@ -1177,7 +1540,13 @@ export function buildFDDRecommendation(task, modality) {
   } else if (modality === "signal") {
     algos.push({
       name: "Sequence models for FDD",
-      intro: "1D CNN / LSTM / GRU encoders; optional harmonic features—paper warns on windowing pitfalls.",
+      intro:
+        "**Supervised** fault classification/regression from **waveforms**: **encoder** → **pooled embedding** → **head**; harmonics can be **pre-features** or learned inside **1D conv**.",
+      architecture: arch(
+        "The **input layer** interfaces signal modality as windows/tensors **(channels x length)** from waveforms or spectra. Ordering along length is preserved so temporal/frequency context is not destroyed by tabular flattening.",
+        "The **hidden layers** use 1D CNN or LSTM/GRU (BiLSTM only when backward context is physically valid). They reveal invariants of local transients, periodic patterns, and causal progression across samples.",
+        "The **output layer** uses softmax for mutually exclusive faults, sigmoid for multi-label faults, or linear heads for regression-style health indices. **Loss** is CE/BCE/MSE according to task, with class weighting/focal variants for imbalance in labeled FDD."
+      ),
       tuning: "Window length, bidirectional LSTM only if causality allows.",
       caseStudy: "**rnn_basics.ipynb**; DAB modulation classification.",
       paper: PAPER.signal_window,
@@ -1189,6 +1558,11 @@ export function buildFDDRecommendation(task, modality) {
       name: "Graph neural networks",
       intro:
         `Graph-level classification of fault modes when circuit graph is available—**connectivity, locality, multi-hop** matter. ${PAPER.graph_invariants}`,
+      architecture: arch(
+        "The **input layer** interfaces graph modality through node features, edge features, and connectivity (adjacency/edge index). This preserves relational PE structure (topology/layout paths) instead of collapsing to one categorical code.",
+        "The **hidden stack** is message passing (GCN/GAT/SAGE) plus graph readout pooling. It reveals invariants of connectivity, local coupling, and multi-hop interactions that often drive fault propagation.",
+        "The **output layer** predicts graph-level or node-level fault logits (softmax/sigmoid) or regression values. **Loss** is CE/BCE/MSE tied to the chosen supervised fault-learning target, with positive-class weighting when rare failures dominate."
+      ),
       tuning: "Graph batching, dropout on edges; watch **over-smoothing** in deep stacks; readout (pool) choice affects fault separability.",
       tricks:
         "Start with **GCN / GraphSAGE / GAT** baselines; temporal faults may need **temporal GNN** or sequence+graph hybrids.",
@@ -1203,7 +1577,13 @@ export function buildFDDRecommendation(task, modality) {
   } else {
     algos.push({
       name: "CNN / vision models",
-      intro: "Thermal/IR images or rasterized PCB **images**—2D CNN backbones.",
+      intro:
+        "**Unstructured** **2D** inputs (thermal camera, IR, PCB raster): standard **CNN** backbones with **ImageNet** init optional—watch **domain shift** vs. lab lighting.",
+      architecture: arch(
+        "The **input layer** interfaces unstructured modality as image tensors (RGB or single-channel thermal) with normalization and consistent camera preprocessing.",
+        "The **hidden layers** are convolutional/residual blocks with pooling, revealing invariants of local spatial patterns, textures, and hotspot morphology in diagnostic imagery.",
+        "The **output layer** provides softmax or sigmoid logits for fault classes (or linear outputs for regression). **Loss** is CE/BCE/MSE depending on the learning task, with focal/weighted variants for rare-fault classification."
+      ),
       tuning: "Augment carefully to avoid domain shift; transfer from ImageNet optional.",
       caseStudy: "Paper unstructured data + thermal CNN references.",
       links: repoLinks([NB.rnn]),
@@ -1217,7 +1597,13 @@ export function buildFDDRecommendation(task, modality) {
   } else if (task === "multilabel") {
     algos.push({
       name: "Multi-label heads",
-      intro: "Sigmoid per class + BCE for co-occurring faults (wire-bond + thermal runaway example in paper).",
+      intro:
+        "Adds a **K-dimensional sigmoid** head so **several faults** can be active—**not** mutually exclusive like softmax (paper **wire-bond + thermal** example).",
+      architecture: arch(
+        "The **input layer** is unchanged from the selected base modality encoder (tabular, signal, graph, or unstructured), so modality-specific interfaces remain intact.",
+        "The **hidden representation** is the shared embedding **z** from the base encoder, which captures fault signatures that can overlap across labels.",
+        "The **output layer** has **K** independent sigmoid logits (one per fault mode). **Loss** is per-class BCEWithLogits (often with class-wise weights), matching the multi-label learning task where multiple simultaneous faults can be true."
+      ),
       tuning: "Pos_weight per label; threshold tuning on validation.",
       caseStudy: "Paper multi-label vs multi-class distinction.",
       paper: "Problem configuration paragraph.",
@@ -1243,27 +1629,101 @@ export function buildFDDRecommendation(task, modality) {
 export function buildRULRecommendation(inMod, probabilistic) {
   const flags = { nn: true, mha: false, tinyml: false, piml: false };
   const extras = { nn: true, mha: false, tinyml: false, piml: false };
+  const modLabel = inMod === "signal" ? "signal-domain" : inMod === "hybrid" ? "hybrid" : "tabular";
+  const deterministicVariant =
+    inMod === "signal"
+      ? {
+          name: "Deterministic sequence RUL regressors",
+          intro:
+            "**LSTM/GRU/TCN** backbones map degradation trajectories to a **point estimate** of remaining life. Best when temporal ordering carries wear progression information that would be lost by static feature aggregation.",
+          architecture: arch(
+            "The **input layer** interfaces **signal modality** as degradation sequences **(T x C)**, where channels are sensor traces or health indicators ordered in time. Sequence alignment and normalization preserve progression semantics.",
+            "The **hidden layers** are temporal models such as **LSTM/GRU/TCN**, which reveal invariants of wear progression, trend shape, and regime transitions across the history window.",
+            "The **output layer** is a linear scalar regressor for remaining time/cycles. **Loss** is **MSE/Huber** against labeled RUL, directly matching deterministic supervised forecasting from temporal degradation evidence."
+          ),
+          links: repoLinks([NB.rul, NB.rnn]),
+        }
+      : inMod === "hybrid"
+        ? {
+            name: "Deterministic multimodal RUL regressors",
+            intro:
+              "Use **multi-branch encoders** when degradation evidence comes from mixed modalities such as tabular health indicators plus waveforms or images, then fuse into a single point-estimate RUL head.",
+            architecture: arch(
+              "The **input layer** interfaces **hybrid modality** through separate branches, for example **MLP** for tabular indicators and **LSTM/CNN** for signals or images. Each branch preserves its native structure before fusion.",
+              "The **hidden stack** is parallel encoders plus a fusion module (concat, attention, or gating) that reveals invariants shared across modalities, such as agreement between static health indicators and temporal degradation signatures.",
+              "The **output layer** is a linear RUL regressor on the fused embedding. **Loss** is **MSE/Huber** on labeled remaining life, tying multimodal evidence to deterministic supervised prognostics."
+            ),
+            links: repoLinks([NB.rul, NB.dabOne]),
+          }
+        : {
+            name: "Deterministic tabular RUL regressors",
+            intro:
+              "**MLP** or probabilistic-boosting baselines without uncertainty output map engineered health indicators to a **point estimate** of remaining life. Use when degradation is well summarized by per-sample features.",
+            architecture: arch(
+              "The **input layer** interfaces **tabular modality** as a fixed-order vector of engineered health indicators, operating summaries, or cycle-level degradation features with careful scaling.",
+              "The **hidden layers** are FC stacks or shallow ensemble-style latent partitions that reveal invariants of smooth degradation trends and feature interactions relevant to wear state.",
+              "The **output layer** is a single linear RUL regressor. **Loss** is **MSE/Huber** against labeled remaining life, matching deterministic supervised regression on tabular prognostics data."
+            ),
+            links: repoLinks([NB.rul, NB.nnBasics]),
+          };
+  const probabilisticVariant =
+    inMod === "signal"
+      ? {
+          name: "Probabilistic sequence RUL (Gaussian / mixture head)",
+          intro:
+            "**Temporal encoders** such as **LSTM/TCN** summarize degradation histories, then predict a distribution over remaining life so uncertainty widens in sparse or regime-shifted parts of sequence space.",
+          architecture: arch(
+            "The **input layer** interfaces **signal modality** as ordered degradation sequences **(T x C)**, preserving temporal progression and cross-channel sensor structure before uncertainty estimation.",
+            "The **hidden backbone** is a temporal encoder that reveals invariants of degradation pace, nonlinearity, and regime transitions in the history window, compressing them into latent state **z**.",
+            "The **output layer** predicts distribution parameters such as **mu**, **log sigma^2**, or mixture weights/components. **Loss** is negative log-likelihood, directly matching probabilistic supervised RUL forecasting from sequence data."
+          ),
+          links: repoLinks([NB.rul, NB.rnn, NB.mdn]),
+        }
+      : inMod === "hybrid"
+        ? {
+            name: "Probabilistic multimodal RUL (fusion + uncertainty head)",
+            intro:
+              "**Multi-branch prognostics** combine heterogeneous degradation evidence, then use a probabilistic head to estimate both expected RUL and confidence under multimodal uncertainty.",
+          architecture: arch(
+            "The **input layer** interfaces **hybrid modality** via separate encoders for tabular, signal, image, or other evidence streams, preserving modality-specific structure before fusion.",
+            "The **hidden stack** is multimodal fusion over branch embeddings, revealing invariants that are stable across modalities while preserving disagreements as uncertainty cues.",
+            "The **output layer** predicts Gaussian or mixture distribution parameters over RUL. **Loss** is negative log-likelihood, so the model learns both central estimate and uncertainty consistent with labeled failure-time outcomes."
+          ),
+          links: repoLinks([NB.rul, NB.dabOne, NB.mdn]),
+        }
+      : {
+          name: "Probabilistic tabular RUL (Gaussian / mixture head)",
+          intro:
+            "**MLP** backbones on engineered health indicators feed a probabilistic output head, giving mean-plus-uncertainty or mixture distributions instead of only a point estimate.",
+          architecture: arch(
+            "The **input layer** interfaces **tabular modality** as a fixed-order feature vector of health indicators and operating summaries with explicit scaling and schema control.",
+            "The **hidden backbone** is an MLP that reveals invariants of degradation trend interactions across features while compressing the health state into latent representation **z**.",
+            "The **output layer** predicts Gaussian or mixture parameters for RUL. **Loss** is negative log-likelihood, which directly optimizes calibrated probabilistic supervised prognostics on tabular data."
+          ),
+          links: repoLinks([NB.rul, NB.mdn, NB.nnBasics]),
+        };
 
   const algos = [];
   if (probabilistic) {
     algos.push({
-      name: "Probabilistic RUL (Gaussian / mixture head)",
-      intro:
-        "Predictive distribution via **NLL** loss; heteroscedastic outputs (mean + variance) or **MDN** for multi-modal uncertainty.",
+      name: probabilisticVariant.name,
+      intro: probabilisticVariant.intro,
+      architecture: probabilisticVariant.architecture,
       tuning: "Variance floor; check calibration; MDN mixture count.",
       caseStudy: "**rul_prediction.ipynb** (IGBT NASA dataset); paper Fig. on uncertainty bands.",
       paper: "RUL section — uncertainty grows in sparse regions.",
-      links: repoLinks([NB.rul, NB.mdn, NB.rnn]),
+      links: probabilisticVariant.links,
       external: [],
     });
   } else {
     algos.push({
-      name: "Deterministic RUL regressors",
-      intro: "MLP/LSTM regress RUL point estimates—simpler but no uncertainty.",
+      name: deterministicVariant.name,
+      intro: deterministicVariant.intro,
+      architecture: deterministicVariant.architecture,
       tuning: "Sequence length for LSTM; early stopping.",
       caseStudy: "**rul_prediction.ipynb** backbone comparisons.",
       paper: "RUL modeling subsection.",
-      links: repoLinks([NB.rul, NB.nnBasics]),
+      links: deterministicVariant.links,
       external: [],
     });
   }
@@ -1272,7 +1732,7 @@ export function buildRULRecommendation(inMod, probabilistic) {
     pathId: null,
     title: `Maintenance — RUL (${inMod} inputs, ${probabilistic ? "probabilistic" : "deterministic"})`,
     summary:
-      "Degradation trajectories from NASA IGBT dataset in tutorial; probabilistic heads recommended when risk matters.",
+      `RUL path for **${modLabel}** inputs. Degradation trajectories from the NASA IGBT tutorial case motivate ${probabilistic ? "**uncertainty-aware**" : "**point-estimate**"} prognostics depending on decision risk.`,
     algorithms: algos,
     flags,
     extras,

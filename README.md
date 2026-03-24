@@ -8,7 +8,7 @@
 
 <p align="center">
   <strong><a href="https://xinzelee.github.io/AI_for_PE_Algorithm_Selector/">Open the web app →</a></strong><br />
-  <sub>If the site is not deployed yet, see <a href="#run-locally">Run locally</a> or <a href="#deploy-with-github-pages">Deploy with GitHub Pages</a>.</sub>
+  <sub>If the hosted link is unavailable, see <a href="#run-locally">Run locally</a>.</sub>
 </p>
 
 ---
@@ -55,23 +55,6 @@ npx --yes serve -l 8765
 
 ---
 
-## Deploy with GitHub Pages
-
-Static site — **no build step**. Pages serves it over **HTTPS** (required for ES modules).
-
-1. Push this folder so **`index.html` is at the repo root** (`index.html`, `css/`, `js/`).
-2. **Settings → Pages** → **Deploy from a branch** → branch **`main`**, folder **`/ (root)`** → Save.
-3. The app will be at **`https://<username>.github.io/<repo>/`**  
-   (example: [`https://xinzelee.github.io/AI_for_PE_Algorithm_Selector/`](https://xinzelee.github.io/AI_for_PE_Algorithm_Selector/)).
-
-**Monorepo:** GitHub Pages from the UI only supports **`/`** or **`/docs`** on the branch — put the app under **`docs/`** or use a **separate repository**. See [GitHub Pages docs](https://docs.github.com/en/pages).
-
-**After deploy:** update the **Open the web app** link at the top of this README if your URL differs.
-
-Notebook links in the app point to **`https://github.com/XinzeLee/Fundamentals_of_AI_for_PE/...`** — keep that repo public or change `REPO_ROOT` in `js/data.js`.
-
----
-
 ## Repository layout
 
 | Path | Role |
@@ -87,3 +70,4 @@ Notebook links in the app point to **`https://github.com/XinzeLee/Fundamentals_o
 ## Notes
 
 - Some paths (e.g. full GNN training, RL training) point to external libraries or papers when the course has no matching notebook.
+- Notebook links in the app point to **`https://github.com/XinzeLee/Fundamentals_of_AI_for_PE/...`** — keep that repo public or change `REPO_ROOT` in `js/data.js`.
