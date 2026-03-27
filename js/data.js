@@ -47,7 +47,7 @@ export const GLOSSARY = {
   data_abundance:
     "**Abundant**: enough labeled samples for supervised training. **Scarce**: prioritize **transfer learning**, **semi-supervised** or **generative** augmentation, and **physics-informed** constraints as in the paper—right-size the model to the label budget.",
   opt_dimension:
-    "**Low-dimensional** design spaces often suit MHAs (PSO, GA, NSGA-II). **High-dimensional** (>100D) control or policy search is often cast as **RL** with deep actors/critics.",
+    "**Low-dimensional** design spaces often suit MHAs (PSO, GA, NSGA-II). **High-dimensional** (>100D) control or policy search is often cast as **RL**—**continuous** actions via deep **actor–critic** / **policy gradient**, **discrete** actions via **DQN**-style **Q-networks** (see **RL_buck_control.ipynb** in the course repo).",
   opt_space:
     "**Continuous** variables suit PSO/DE (vector arithmetic). **Discrete** combinatorial choices align with SA/ACO-style operators. **Hybrid** mixed spaces frequently use **GA**.",
   opt_objectives:
@@ -57,7 +57,7 @@ export const GLOSSARY = {
   control_role:
     "**AI as controller** embeds learned policies (RL or imitation NN). **Assist control design** builds surrogates or tunes gains—maps back to modeling or optimization branches.",
   policy_type:
-    "**RL** learns from environment interaction and rewards (Markov decision process). **Imitation** learns to mimic an existing controller or surrogate—often an NN trained offline then optionally deployed.",
+    "**RL** learns from environment interaction and rewards (MDP): e.g. **DQN** for **discrete** actions, **DDPG/SAC** for **continuous** control. **Imitation** learns to mimic an existing controller or surrogate—often an NN trained offline then optionally deployed.",
   deployment:
     "**Online** runs on hardware/MCU/FPGA with latency and memory limits—consider **TinyML**: quantization, pruning, shallow-wide nets, ONNX Runtime/TFLite as in the tutorial case study.",
   maint_fdd:
@@ -294,7 +294,7 @@ export const TUTORIAL_ML_PIPELINE = `
 /** Optimization paths 51–59 — concise */
 export const OPTIMIZATION_REVIEW_HTML = `
 <ul class="report-list">
-  <li><strong>51–53 (high-D RL):</strong> match action space (continuous vs discrete vs hybrid); reward design, sim-to-real, and safety matter more than algorithm labels—compare seeds and report spread.</li>
+  <li><strong>51–53 (high-D RL):</strong> match action space (continuous vs discrete vs hybrid); reward design, sim-to-real, and safety matter more than algorithm labels—compare seeds and report spread. The public course repo includes a <strong>pedagogical DQN</strong> notebook (<code>RL_buck_control.ipynb</code>)—discrete duty steps on an averaged buck; production work often still relies on libraries such as Stable-Baselines3.</li>
   <li><strong>54–59 (low-D MHA):</strong> PSO/DE on continuous vectors; GA/SA/ACO on discrete/hybrid; NSGA-II/III for Pareto fronts—<strong>normalize objectives</strong> before weighted sums or crowding.</li>
 </ul>`;
 
@@ -326,6 +326,7 @@ const NB = {
   pannReadme: "5_PIML/PANN/README.md",
   agentic: "6_Agentic_AI/README.md",
   rl: "7_Reinforcement_Learning/README.md",
+  rlBuck: "7_Reinforcement_Learning/RL_buck_control.ipynb",
   ltspice: "8_PE_Simulation_Automation/LTspiceAutomation/LTspiceAtuomate.ipynb",
   plecs: "8_PE_Simulation_Automation/PlecsAutomation/Data acquisition.ipynb",
   simReadme: "8_PE_Simulation_Automation/README.md",
@@ -1072,21 +1073,22 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
     else pathId = 53;
     title = `Path ${pathId}: High-dimensional RL (${rlSpace === "cont" ? "continuous" : rlSpace === "disc" ? "discrete" : "hybrid"} action space)`;
     summary =
-      "Deep RL (DDPG/SAC for continuous, DQN for discrete, parameterized actions for hybrid) for large policy/control parameter vectors. The public repo documents RL concepts but **does not ship RL training notebooks**—use external RL libraries.";
+      "Deep RL (DDPG/SAC for continuous, DQN for discrete, parameterized actions for hybrid) for large policy/control parameter vectors. The public repo’s **7_Reinforcement_Learning** folder includes **RL_buck_control.ipynb**: a **DQN** tutorial (**discrete** duty increments, replay, target net, Double DQN, Huber TD loss) on an **averaged** buck model—for full converter or continuous-action agents, pair the README with **external RL frameworks** (e.g. Stable-Baselines3).";
     algorithms.push({
       name: "Deep RL (DDPG / SAC / DQN / parameterized)",
       intro:
-        "**Policy π(a|s)** (or **Q(s,a)** for DQN) is a **neural network**: **state** = measurements / estimates; **action** = modulation, duty, references. **Reward** encodes tracking, losses, constraints—often dominates performance more than minor algorithm tweaks.",
+        "**Policy π(a|s)** (actor–critic / SAC / DDPG) or **Q(s,a)** (**DQN** and variants for **discrete** actions): all map **state** (measurements / estimates) to **actions** (modulation, duty, references). **Reward** encodes tracking, losses, constraints—often dominates performance more than minor algorithm tweaks.",
       architecture: arch(
         "**Input layer** is **state vector** **s** ( **voltages**, **currents**, **references**, **errors** )—same **normalization** as **supervised** **NN**; **interface** is **tabular** **→** **FC** **first** **weights**.",
         "**Hidden:** **2–4** **FC** **layers** **learn** **nonlinear** **value**/**policy** **over** **state**—**invariants** are **implicit** **dynamics** **compressed** **into** **features** **(no** **explicit** **PDE** **unless** **you** **encode** **it** **in** **state** **or** **reward** **)**.",
         "**Output:** **continuous** **action** **(tanh** **+** **scale**)** **or** **|A|** **Q** **values**/**logits**. **Loss:** **not** **label** **matching**—**policy** **gradient**/**Bellman** **MSE**/**entropy** **(SAC)** **optimize** **expected** **return** **from** **environment** **interaction**; **CE** **only** **if** **distilling** **teacher**."
       ),
       tuning:
-        "Reward shaping, exploration noise, target nets, experience replay; sim-to-real gap for PE hardware.",
-      caseStudy: "Literature cases in paper’s RL discussion—not duplicated locally.",
+        "Reward shaping, ε-greedy or entropy exploration, target nets, replay, gradient stabilization (e.g. Huber TD loss, clipping); sim-to-real gap for PE hardware.",
+      caseStudy:
+        "**RL_buck_control.ipynb**: averaged-buck voltage tracking with **DQN** (discrete ΔD); paper’s RL discussion for broader literature.",
       paper: "RL section + reward engineering citations.",
-      links: [{ label: "7_Reinforcement_Learning/README.md", href: ghBlob(NB.rl) }],
+      links: repoLinks([NB.rl, NB.rlBuck], ["README.md (RL folder)", "RL_buck_control.ipynb (DQN buck)"]),
       external: [
         { label: "Stable-Baselines3 (PyTorch RL)", href: "https://github.com/DLR-RM/stable-baselines3" },
         { label: "IEEE TIE survey — RL for PE converters (Chen et al.)", href: "https://ieeexplore.ieee.org/document/10665444" },
@@ -1290,16 +1292,16 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Reinforcement learning control",
       intro:
-        "Same **actor–critic** / **DQN** picture as high-dimensional design RL but **states** and **actions** update at **control rate**; **safety filters** (limits, Lyapunov-style shields) often wrap the NN output for hardware.",
+        "Same **value-based** (**DQN** for **discrete** actions) or **actor–critic** (**continuous** duty / references) picture as design RL, but **states** and **actions** update at **control rate**. **Safety filters** (limits, Lyapunov-style shields) often wrap NN outputs on hardware. The course **RL_buck_control.ipynb** trains **DQN** with **discrete** duty steps on an **averaged** buck (pedagogical surrogate).",
       architecture: arch(
         "**Input** is **observation** **vector** **(or** **short** **waveform** **→** **1D** **CNN** **stem**)** **from** **sensors**/**estimator**—**interface** **maps** **physical** **signals** **to** **fixed** **dim** **before** **control** **head**.",
         "**Hidden:** **FC**/**CNN** **layers** **encode** **feasible** **control** **responses** **to** **state** **trajectories**—**invariants** **learned** **from** **reward** **shaping**, **not** **from** **static** **labels**.",
-        "**Output:** **continuous** **duty** **cycle**/**reference** **or** **discrete** **switching**. **Loss:** **RL** **objective** **(PG**/**soft** **Q**)**; **optional** **BC** **MSE** **pretrain** **from** **expert** **trajectories** **then** **fine-tune** **with** **RL**."
+        "**Output:** **|A|** **Q-values**/**logits** (**DQN**) **or** **continuous** **action** (**tanh**+scale **for** **DDPG/SAC**). **Loss:** **Bellman**/**TD** **on** **Q** **(with** **target** **net**/**Double** **DQN)** **or** **policy-gradient**/**entropy** **objectives**; **optional** **BC** **MSE** **pretrain** **then** **fine-tune** **with** **RL**."
       ),
-      tuning: "Reward engineering dominates; exploration strategies; safety filters for hardware.",
-      caseStudy: "Tutorial cites RL control surveys; repo README points to external implementations.",
+      tuning: "Reward engineering dominates; ε-greedy / exploration noise; target nets and replay for off-policy Q-learning; safety filters for hardware.",
+      caseStudy: "**RL_buck_control.ipynb** (DQN, discrete ΔD, variable **V_in** per episode); tutorial RL control surveys.",
       paper: "RL control subsection.",
-      links: [{ label: "7_Reinforcement_Learning/README.md", href: ghBlob(NB.rl) }],
+      links: repoLinks([NB.rl, NB.rlBuck], ["README.md (RL folder)", "RL_buck_control.ipynb (DQN buck)"]),
       external: [{ label: "Stable-Baselines3", href: "https://github.com/DLR-RM/stable-baselines3" }],
     });
   } else {
@@ -1763,7 +1765,7 @@ export const ARTICLE = {
     "PE objectives (**efficiency**, **density**, **reliability**, **cost**) conflict—**multi-objective** formulations are natural. **Decomposition** methods split the problem into weighted single-objective subproblems; **weights** and **scale normalization** matter. **Population-based** methods approximate the **Pareto front**; **non-dominated sorting (NSA)** ranks solutions by dominance. **NSA** is exact in small **discrete** spaces but hits the **curse of dimensionality** when continuous spaces are discretized—**NSGA-II/III** integrate NSA with metaheuristic search for practical PE fronts.",
 
   rl:
-    "**RL** learns policies by **interaction** and **rewards**, often as a **Markov decision process**: **actors** map states to actions, **critics** estimate value. **Reward design** is critical—it encodes objectives and trade-offs (steady-state vs. transient). RL suits **control** (converter as environment) and **high-dimensional** sequential decisions; compare runs with multiple **seeds** and statistical tests.",
+    "**RL** learns policies by **interaction** and **rewards**, often as a **Markov decision process**. **Discrete** action sets often use **value-based** methods (**DQN** and variants: replay, target networks, Double DQN); **continuous** control commonly uses **actor–critic** or **policy-gradient** algorithms (**DDPG**, **SAC**, …). **Reward design** is critical—it encodes objectives and trade-offs (steady-state vs. transient). RL suits **control** (converter as environment) and **high-dimensional** sequential decisions; compare runs with multiple **seeds** and statistical tests.",
 
   ml_workflow:
     "Data-driven projects follow a **generic ML workflow**: (1) **data acquisition**, (2) **EDA and preprocessing**, (3) **model training**, (4) **hyperparameter tuning**, (5) **deployment**. **Steps 2–4 loop**: poor predictions often signal **bad data** or **outliers**—return to **EDA**.",
@@ -1935,7 +1937,7 @@ export function getRepoArticleAlignment(state, rec) {
     (phase === "control" && state.controlMode === "assist" && state.assistBranch === "optimization")
   ) {
     if (state.optDim === "high") {
-      push("7_Reinforcement_Learning", "IV-D; IV-F");
+      push("7_Reinforcement_Learning", "IV-D; IV-F — RL_buck_control.ipynb (DQN buck example)");
     } else {
       push("1_MHA/Single_Objective_MHA", "II-A; II-C; II-D");
       if (state.optMoo) push("1_MHA/Multi_Objective_MHA", "II-B; II-C");
@@ -1954,7 +1956,7 @@ export function getRepoArticleAlignment(state, rec) {
       push("4_Neural_Network/Fundamentals", "III; IV-C; IV-D; IV-F");
       push("4_Neural_Network/Good_Practices", "IV-G");
     }
-    if (state.controlPolicy === "rl") push("7_Reinforcement_Learning", "IV-D; IV-F");
+    if (state.controlPolicy === "rl") push("7_Reinforcement_Learning", "IV-D; IV-F — RL_buck_control.ipynb (DQN buck example)");
     if (state.controlDeploy === "online") push("9_Case_Studies_PE/DAB_Design/Adaptive_Modulation", "VII-D");
   }
 

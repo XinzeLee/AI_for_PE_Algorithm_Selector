@@ -69,5 +69,6 @@ npx --yes serve -l 8765
 
 ## Notes
 
-- Some paths (e.g. full GNN training, RL training) point to external libraries or papers when the course has no matching notebook.
+- **RL:** the course ships **7_Reinforcement_Learning/RL_buck_control.ipynb** (pedagogical **DQN** on an averaged buck). Broader RL stacks (e.g. SAC/DDPG at scale) still often use external libraries; the selector links Stable-Baselines3 where relevant.
+- Some paths (e.g. full GNN training) point to external libraries or papers when the course has no matching notebook.
 - Notebook links in the app point to **`https://github.com/XinzeLee/Fundamentals_of_AI_for_PE/...`** — keep that repo public or change `REPO_ROOT` in `js/data.js`.
