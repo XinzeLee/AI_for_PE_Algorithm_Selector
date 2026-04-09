@@ -837,7 +837,8 @@ function renderResults(rec) {
       <h3 class="extras-h3">Physics-informed ML — course entry points</h3>
       <p>${formatRichText(GLOSSARY.piml)}</p>
       <ul class="link-list">
-        <li><a href="${ghBlob("5_PIML/PINN/pinn_ode.ipynb")}" target="_blank" rel="noopener">pinn_ode.ipynb</a></li>
+        <li><a href="${ghBlob("5_PIML/PINN/pinn_ode.ipynb")}" target="_blank" rel="noopener">pinn_ode.ipynb</a> — cooling ODE; learnable positive <strong>k</strong> via <code>exp(log k)</code>; fixed grids, soft IC, weighted composite loss, Adam + clip + plateau + optional L-BFGS</li>
+        <li><a href="${ghBlob("5_PIML/PINN/pinn_pde.ipynb")}" target="_blank" rel="noopener">pinn_pde.ipynb</a> — Burgers PDE; same stability-oriented training pattern as <code>pinn_ode</code></li>
         <li><a href="${ghBlob("5_PIML/PINN/prior_integration_example.ipynb")}" target="_blank" rel="noopener">prior_integration_example.ipynb</a></li>
         <li><a href="${ghBlob("5_PIML/PANN/README.md")}" target="_blank" rel="noopener">PANN/README.md</a></li>
         <li><a href="${ghBlob("5_PIML/README.md")}" target="_blank" rel="noopener">5_PIML/README.md</a></li>

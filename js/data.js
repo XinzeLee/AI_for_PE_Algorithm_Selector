@@ -47,7 +47,7 @@ export const GLOSSARY = {
   data_abundance:
     "**Abundant**: enough labeled samples for supervised training. **Scarce**: prioritize **transfer learning**, **semi-supervised** or **generative** augmentation, and **physics-informed** constraints as in the paper—right-size the model to the label budget.",
   opt_dimension:
-    "**Low-dimensional** design spaces often suit MHAs (PSO, GA, NSGA-II). **High-dimensional** (>100D) control or policy search is often cast as **RL**—**continuous** actions via deep **actor–critic** / **policy gradient**, **discrete** actions via **DQN**-style **Q-networks** (see **RL_buck_control.ipynb** in the course repo).",
+    "**Low-dimensional** design spaces often suit MHAs (PSO, GA, NSGA-II). **High-dimensional** (>100D) control or policy search is often cast as **RL**—**continuous** actions via **DDPG** / **SAC** (**actor–critic**), **discrete** actions via **DQN** (**Q-networks**). The course repo pairs **DDPG_buck_control.ipynb** (continuous duty) with **RL_buck_control.ipynb** (discrete ΔD) on the same averaged-buck tutorial.",
   opt_space:
     "**Continuous** variables suit PSO/DE (vector arithmetic). **Discrete** combinatorial choices align with SA/ACO-style operators. **Hybrid** mixed spaces frequently use **GA**.",
   opt_objectives:
@@ -57,7 +57,7 @@ export const GLOSSARY = {
   control_role:
     "**AI as controller** embeds learned policies (RL or imitation NN). **Assist control design** builds surrogates or tunes gains—maps back to modeling or optimization branches.",
   policy_type:
-    "**RL** learns from environment interaction and rewards (MDP): e.g. **DQN** for **discrete** actions, **DDPG/SAC** for **continuous** control. **Imitation** learns to mimic an existing controller or surrogate—often an NN trained offline then optionally deployed.",
+    "**RL** learns from environment interaction and rewards (MDP): e.g. **DQN** for **discrete** actions, **DDPG/SAC** for **continuous** control—**RL_buck_control.ipynb** vs. **DDPG_buck_control.ipynb** illustrate both on the same averaged buck. **Imitation** learns to mimic an existing controller or surrogate—often an NN trained offline then optionally deployed.",
   deployment:
     "**Online** runs on hardware/MCU/FPGA with latency and memory limits—consider **TinyML**: quantization, pruning, shallow-wide nets, ONNX Runtime/TFLite as in the tutorial case study.",
   maint_fdd:
@@ -88,7 +88,7 @@ const PAPER = {
   signal_window:
     "Sliding-window **tabularization** of waveforms is common but can break causality and long-range dependencies—prefer recurrent or 1D CNN architectures when sequences matter.",
   piml_loss:
-    "Combine data loss with **physics residuals**; weighting is problem-specific; PINNs can complement FEM for multi-physics.",
+    "Use **weighted composite** objectives—e.g. **λ_pde·‖residual‖²** + **λ_ic·‖IC‖²** + **λ_bc·‖BC‖²** (+ optional **supervised data** term)—on **fixed** collocation / IC / BC point sets; tune scalars so no single term dominates. Course **pinn_ode.ipynb** (ODE) and **pinn_pde.ipynb** (Burgers PDE) follow this recipe with Adam + gradient clipping + optional L-BFGS; PINNs can complement FEM for multi-physics.",
   eda:
     "**EDA:** histograms (spread, skew, modality), correlation maps (redundant features, latent equality constraints), **t-SNE** for manifold / transfer scenarios; from-to-viz catalog for plot choice.",
   transfer:
@@ -133,7 +133,8 @@ export const PATH_ENUM_PAIRS = {
     abundant:
       "**Paths 7–8:** FNN → **CNN** field head, **PINN** with coupled physics, or **FNN-on-flattened** field. *Enumeration:* field modeling from parameters—efficiency, loss density maps.",
     scarce: "PINN with physics residuals; blend sparse experiments with **physics-informed** regularization under small label sets.",
-    workflow: "Parameter vector → decoder grid; PINN: add PDE residual + boundary terms to data loss.",
+    workflow:
+      "Parameter vector → decoder grid; PINN: **fixed** collocation (and IC/BC points); **soft** IC/BC via MSE penalties; **weighted composite** loss vs. pure `data + α·physics` (see **pinn_pde.ipynb** / **pinn_ode.ipynb**).",
     pitfalls: "Pure image-CNN on fields may ignore **geometry and multi-physics coupling**—open research vs. PINN/geometry-aware operators.",
   },
   tabular_hybrid: {
@@ -294,7 +295,7 @@ export const TUTORIAL_ML_PIPELINE = `
 /** Optimization paths 51–59 — concise */
 export const OPTIMIZATION_REVIEW_HTML = `
 <ul class="report-list">
-  <li><strong>51–53 (high-D RL):</strong> match action space (continuous vs discrete vs hybrid); reward design, sim-to-real, and safety matter more than algorithm labels—compare seeds and report spread. The public course repo includes a <strong>pedagogical DQN</strong> notebook (<code>RL_buck_control.ipynb</code>)—discrete duty steps on an averaged buck; production work often still relies on libraries such as Stable-Baselines3.</li>
+  <li><strong>51–53 (high-D RL):</strong> match action space (continuous vs discrete vs hybrid); reward design, sim-to-real, and safety matter more than algorithm labels—compare seeds and report spread. The course repo includes <strong>pedagogical buck</strong> notebooks: <code>DDPG_buck_control.ipynb</code> (<strong>continuous</strong> duty) and <code>RL_buck_control.ipynb</code> (<strong>discrete</strong> ΔD) on the same averaged model—production work often still relies on libraries such as Stable-Baselines3.</li>
   <li><strong>54–59 (low-D MHA):</strong> PSO/DE on continuous vectors; GA/SA/ACO on discrete/hybrid; NSGA-II/III for Pareto fronts—<strong>normalize objectives</strong> before weighted sums or crowding.</li>
 </ul>`;
 
@@ -320,6 +321,7 @@ const NB = {
   rnn: "4_Neural_Network/Signal_Domain/rnn_basics.ipynb",
   mdn: "4_Neural_Network/Multi_Modal_Distribution/mixture_density_net_ensemble_learning.ipynb",
   pinnOde: "5_PIML/PINN/pinn_ode.ipynb",
+  pinnPde: "5_PIML/PINN/pinn_pde.ipynb",
   pinn1: "5_PIML/PINN/prior_integration_example.ipynb",
   pinn2: "5_PIML/PINN/prior_integration_example2.ipynb",
   pimlReadme: "5_PIML/README.md",
@@ -327,6 +329,8 @@ const NB = {
   agentic: "6_Agentic_AI/README.md",
   rl: "7_Reinforcement_Learning/README.md",
   rlBuck: "7_Reinforcement_Learning/RL_buck_control.ipynb",
+  rlBuckDdpg: "7_Reinforcement_Learning/DDPG_buck_control.ipynb",
+  attentionFdd: "9_Case_Studies_PE/PV_Plant_FDD/attention_fdd.ipynb",
   ltspice: "8_PE_Simulation_Automation/LTspiceAutomation/LTspiceAtuomate.ipynb",
   plecs: "8_PE_Simulation_Automation/PlecsAutomation/Data acquisition.ipynb",
   simReadme: "8_PE_Simulation_Automation/README.md",
@@ -370,9 +374,9 @@ export function buildModelingRecommendation(inKey, outKey, scarce) {
   const tout = MOD_LABELS[o];
 
   const scarceNote = scarce
-    ? `<p class="paper-note"><strong>Scarce labels:</strong> favor <strong>transfer learning</strong>, <strong>semi-supervised</strong> or <strong>generative</strong> augmentation, and <strong>physics-informed</strong> constraints (${ghBlob(
-        NB.pinn1
-      )}) where applicable; <strong>avoid oversized models</strong> for the label budget.</p>`
+    ? `<p class="paper-note"><strong>Scarce labels:</strong> favor <strong>transfer learning</strong>, <strong>semi-supervised</strong> or <strong>generative</strong> augmentation, and <strong>physics-informed</strong> constraints (see <a href="${ghBlob(
+        NB.pimlReadme
+      )}" target="_blank" rel="noopener">5_PIML/README.md</a> — <code>pinn_ode.ipynb</code>, <code>pinn_pde.ipynb</code>, priors) where applicable; <strong>avoid oversized models</strong> for the label budget.</p>`
     : "";
 
   const pe = PATH_ENUM_PAIRS[`${inKey}_${outKey}`];
@@ -534,12 +538,15 @@ const MODEL_PAIRS = {
         architecture: arch(
           "**Input layer** concatenates **field modality** support—**coordinates** **(x,y,z,t)** (often **normalized**)—with optional **tabular/design parameters** (material, geometry knobs) so the same network can **condition** the field on the converter instance. **Collocation points** are additional **inputs** used only in the **PDE term**, not as supervised labels.",
           "**Hidden** trunk is an **MLP** (or **conv** on structured grids) that approximates **u(x,…)**. Its role is to be **flexible** enough to fit data while **PDE residuals** in the loss **impose invariants** of **governing equations** and **boundaries**—the **physics-informed** invariant rather than pure **translation equivariance** of a blind CNN.",
-          "**Output** is field value(s) **u** (or **multi-channel** fields); **inverse PINNs** also expose **trainable scalars** (**R**, **k**) that enter the **residual**. **Loss** = **MSE** on **measured** points (**supervised** fit to **field or probe data**) + **λ**·**‖PDE(u)‖²** (+ **BC/IC** terms). **λ** balances **data vs. physics**; the learning task is **regression under PDE constraints**, not classification."
+          "**Output** is field value(s) **u** (or **multi-channel** fields); **inverse PINNs** also expose **positive trainable scalars** (e.g. **k** via **exp(log k)** in **pinn_ode.ipynb**) that enter the **residual**. **Loss** is typically a **weighted sum**: **MSE** on **supervised** points + **λ_pde·‖residual‖²** + **λ_ic·‖IC‖²** + **λ_bc·‖BC‖²** (+ optional sparse **data** term), often on **fixed** collocation/IC/BC grids with **Adam** + **gradient clipping** + **ReduceLROnPlateau** and optional **L-BFGS** polish—the learning task is **regression under PDE/ODE constraints**, not classification."
         ),
         tuning: "Loss weighting data vs. PDE terms; learning rate; many epochs may be needed.",
         caseStudy: "Tutorial apparent-power constraint example; thermal/EM PDE contexts.",
         paper: PAPER.piml_loss,
-        links: repoLinks([NB.pinnOde, NB.pinn1, NB.pinn2, NB.pimlReadme]),
+        links: repoLinks(
+          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.pinn2, NB.pimlReadme],
+          ["pinn_ode.ipynb (cooling ODE)", "pinn_pde.ipynb (Burgers PDE)", "prior_integration_example.ipynb", "prior_integration_example2.ipynb", "5_PIML/README.md"]
+        ),
         external: [{ label: "Physics-informed ML — Nature Reviews Physics survey (cited in paper)", href: "https://www.nature.com/articles/s42254-021-00314-5" }],
       },
       {
@@ -809,7 +816,7 @@ const MODEL_PAIRS = {
         tuning: "Coupling losses between graph embedding and field supervision.",
         caseStudy: "Use PINN notebooks for field half.",
         paper: "Field + graph discussion.",
-        links: repoLinks([NB.pinn1]),
+        links: repoLinks([NB.pinnOde, NB.pinnPde, NB.pinn1], ["pinn_ode.ipynb", "pinn_pde.ipynb", "prior_integration_example.ipynb"]),
         external: [],
       },
     ],
@@ -919,7 +926,10 @@ const MODEL_PAIRS = {
         tuning: "Boundary conditions in loss; weight scheduling.",
         caseStudy: "PINN notebooks + magnetic examples.",
         paper: PAPER.piml_loss,
-        links: repoLinks([NB.pinnOde, NB.pinn1, NB.magnetFnn]),
+        links: repoLinks(
+          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.magnetFnn],
+          ["pinn_ode.ipynb", "pinn_pde.ipynb", "prior_integration_example.ipynb", "magnet_fnn.ipynb"]
+        ),
         external: [],
       },
     ],
@@ -1073,7 +1083,7 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
     else pathId = 53;
     title = `Path ${pathId}: High-dimensional RL (${rlSpace === "cont" ? "continuous" : rlSpace === "disc" ? "discrete" : "hybrid"} action space)`;
     summary =
-      "Deep RL (DDPG/SAC for continuous, DQN for discrete, parameterized actions for hybrid) for large policy/control parameter vectors. The public repo’s **7_Reinforcement_Learning** folder includes **RL_buck_control.ipynb**: a **DQN** tutorial (**discrete** duty increments, replay, target net, Double DQN, Huber TD loss) on an **averaged** buck model—for full converter or continuous-action agents, pair the README with **external RL frameworks** (e.g. Stable-Baselines3).";
+      "Deep RL (DDPG/SAC for continuous, DQN for discrete, parameterized actions for hybrid) for large policy/control parameter vectors. The repo’s **7_Reinforcement_Learning** folder includes **DDPG_buck_control.ipynb** (**continuous** duty, actor–critic, replay, soft target updates) and **RL_buck_control.ipynb** (**DQN**, discrete ΔD, replay, target net, Huber TD loss) on the **same averaged buck** surrogate—for full converters or scale, pair with **external RL frameworks** (e.g. Stable-Baselines3).";
     algorithms.push({
       name: "Deep RL (DDPG / SAC / DQN / parameterized)",
       intro:
@@ -1086,9 +1096,12 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       tuning:
         "Reward shaping, ε-greedy or entropy exploration, target nets, replay, gradient stabilization (e.g. Huber TD loss, clipping); sim-to-real gap for PE hardware.",
       caseStudy:
-        "**RL_buck_control.ipynb**: averaged-buck voltage tracking with **DQN** (discrete ΔD); paper’s RL discussion for broader literature.",
+        "**DDPG_buck_control.ipynb** (continuous duty) and **RL_buck_control.ipynb** (DQN, discrete ΔD) on the averaged buck; paper’s RL discussion for broader literature.",
       paper: "RL section + reward engineering citations.",
-      links: repoLinks([NB.rl, NB.rlBuck], ["README.md (RL folder)", "RL_buck_control.ipynb (DQN buck)"]),
+      links: repoLinks(
+        [NB.rl, NB.rlBuckDdpg, NB.rlBuck],
+        ["README.md (RL folder)", "DDPG_buck_control.ipynb (DDPG)", "RL_buck_control.ipynb (DQN)"]
+      ),
       external: [
         { label: "Stable-Baselines3 (PyTorch RL)", href: "https://github.com/DLR-RM/stable-baselines3" },
         { label: "IEEE TIE survey — RL for PE converters (Chen et al.)", href: "https://ieeexplore.ieee.org/document/10665444" },
@@ -1292,16 +1305,19 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Reinforcement learning control",
       intro:
-        "Same **value-based** (**DQN** for **discrete** actions) or **actor–critic** (**continuous** duty / references) picture as design RL, but **states** and **actions** update at **control rate**. **Safety filters** (limits, Lyapunov-style shields) often wrap NN outputs on hardware. The course **RL_buck_control.ipynb** trains **DQN** with **discrete** duty steps on an **averaged** buck (pedagogical surrogate).",
+        "Same **value-based** (**DQN** for **discrete** actions) or **actor–critic** (**DDPG** for **continuous** duty / references) picture as design RL, but **states** and **actions** update at **control rate**. **Safety filters** (limits, Lyapunov-style shields) often wrap NN outputs on hardware. Use **DDPG_buck_control.ipynb** (continuous) and **RL_buck_control.ipynb** (discrete ΔD) as paired tutorials on the **averaged** buck.",
       architecture: arch(
         "**Input** is **observation** **vector** **(or** **short** **waveform** **→** **1D** **CNN** **stem**)** **from** **sensors**/**estimator**—**interface** **maps** **physical** **signals** **to** **fixed** **dim** **before** **control** **head**.",
         "**Hidden:** **FC**/**CNN** **layers** **encode** **feasible** **control** **responses** **to** **state** **trajectories**—**invariants** **learned** **from** **reward** **shaping**, **not** **from** **static** **labels**.",
         "**Output:** **|A|** **Q-values**/**logits** (**DQN**) **or** **continuous** **action** (**tanh**+scale **for** **DDPG/SAC**). **Loss:** **Bellman**/**TD** **on** **Q** **(with** **target** **net**/**Double** **DQN)** **or** **policy-gradient**/**entropy** **objectives**; **optional** **BC** **MSE** **pretrain** **then** **fine-tune** **with** **RL**."
       ),
       tuning: "Reward engineering dominates; ε-greedy / exploration noise; target nets and replay for off-policy Q-learning; safety filters for hardware.",
-      caseStudy: "**RL_buck_control.ipynb** (DQN, discrete ΔD, variable **V_in** per episode); tutorial RL control surveys.",
+      caseStudy: "**DDPG_buck_control.ipynb** / **RL_buck_control.ipynb** (same buck); tutorial RL control surveys.",
       paper: "RL control subsection.",
-      links: repoLinks([NB.rl, NB.rlBuck], ["README.md (RL folder)", "RL_buck_control.ipynb (DQN buck)"]),
+      links: repoLinks(
+        [NB.rl, NB.rlBuckDdpg, NB.rlBuck],
+        ["README.md (RL folder)", "DDPG_buck_control.ipynb (DDPG)", "RL_buck_control.ipynb (DQN)"]
+      ),
       external: [{ label: "Stable-Baselines3", href: "https://github.com/DLR-RM/stable-baselines3" }],
     });
   } else {
@@ -1550,9 +1566,9 @@ export function buildFDDRecommendation(task, modality) {
         "The **output layer** uses softmax for mutually exclusive faults, sigmoid for multi-label faults, or linear heads for regression-style health indices. **Loss** is CE/BCE/MSE according to task, with class weighting/focal variants for imbalance in labeled FDD."
       ),
       tuning: "Window length, bidirectional LSTM only if causality allows.",
-      caseStudy: "**rnn_basics.ipynb**; DAB modulation classification.",
+      caseStudy: "**rnn_basics.ipynb**; **attention_fdd.ipynb** (PV plant waveforms, Transformer-style encoder + early stopping); DAB modulation classification.",
       paper: PAPER.signal_window,
-      links: repoLinks([NB.rnn, NB.dabOne]),
+      links: repoLinks([NB.rnn, NB.attentionFdd, NB.dabOne], ["rnn_basics.ipynb", "attention_fdd.ipynb (PV FDD)", "one_stop_AI_DAB_modulation.ipynb"]),
       external: [],
     });
   } else if (modality === "graph") {
@@ -1937,7 +1953,7 @@ export function getRepoArticleAlignment(state, rec) {
     (phase === "control" && state.controlMode === "assist" && state.assistBranch === "optimization")
   ) {
     if (state.optDim === "high") {
-      push("7_Reinforcement_Learning", "IV-D; IV-F — RL_buck_control.ipynb (DQN buck example)");
+      push("7_Reinforcement_Learning", "IV-D; IV-F — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
     } else {
       push("1_MHA/Single_Objective_MHA", "II-A; II-C; II-D");
       if (state.optMoo) push("1_MHA/Multi_Objective_MHA", "II-B; II-C");
@@ -1956,7 +1972,7 @@ export function getRepoArticleAlignment(state, rec) {
       push("4_Neural_Network/Fundamentals", "III; IV-C; IV-D; IV-F");
       push("4_Neural_Network/Good_Practices", "IV-G");
     }
-    if (state.controlPolicy === "rl") push("7_Reinforcement_Learning", "IV-D; IV-F — RL_buck_control.ipynb (DQN buck example)");
+    if (state.controlPolicy === "rl") push("7_Reinforcement_Learning", "IV-D; IV-F — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
     if (state.controlDeploy === "online") push("9_Case_Studies_PE/DAB_Design/Adaptive_Modulation", "VII-D");
   }
 
