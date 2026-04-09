@@ -41,7 +41,7 @@ export const GLOSSARY = {
   modality_graph:
     "**Nodes/edges**: topologies, PCBs, modules. Captures connectivity and multi-hop effects; graph neural layers are appropriate when relational structure is essential.",
   modality_field:
-    "**2D/3D multi-physics** samples (flux, temperature). Geometry and PDE structure matter; CNNs or PINNs are common; treating fields as plain images may ignore physics.",
+    "**2D/3D multi-physics** samples (flux, temperature). Geometry and PDE structure matter; **gridded** fields suit CNNs; **scattered** probe points with \\((x,y,z)\\) and operating conditions can be learned with **residual FNNs**—see **`field_temperature_residual_fnn.ipynb`** (`4_Neural_Network/Field_Data/`). PINNs add explicit PDE residuals; treating fields as plain images may ignore **boundaries** and **physics**.",
   modality_hybrid:
     "Multiple representations jointly (e.g., tabular + waveform + image). Use **multi-branch** encoders and fusion (concat, gating, attention).",
   data_abundance:
@@ -73,7 +73,7 @@ export const GLOSSARY = {
   mha_tuning:
     "Balance **exploration vs. exploitation** (e.g. PSO inertia schedules); customize when landscape is multi-modal (niching) or steep (gradient hints). Compare runs with **statistical tests** (t-test / ANOVA).",
   nn_practice:
-    "Feature **scaling**, train/val/test splits, BatchNorm/LayerNorm placement, residual paths, early stopping, regularization (L1/L2), and architecture ablation—detailed in the tutorial and in course notebooks.",
+    "Feature **scaling**, train/val/test splits (including **per-dataset / per-CSV** splits when each file is an operating case), BatchNorm/LayerNorm placement, **residual** skip paths, early stopping (**best weights** in memory or on disk per notebook), regularization (L1/L2), and architecture ablation—see **`good_practice_NN.ipynb`**, **`field_temperature_residual_fnn.ipynb`** (3-D **T** field from scattered samples), and related course notebooks.",
 };
 
 const PAPER = {
@@ -134,7 +134,7 @@ export const PATH_ENUM_PAIRS = {
       "**Paths 7–8:** FNN → **CNN** field head, **PINN** with coupled physics, or **FNN-on-flattened** field. *Enumeration:* field modeling from parameters—efficiency, loss density maps.",
     scarce: "PINN with physics residuals; blend sparse experiments with **physics-informed** regularization under small label sets.",
     workflow:
-      "Parameter vector → decoder grid; PINN: **fixed** collocation (and IC/BC points); **soft** IC/BC via MSE penalties; **weighted composite** loss vs. pure `data + α·physics` (see **pinn_pde.ipynb** / **pinn_ode.ipynb**).",
+      "Parameter vector → decoder grid; PINN: **fixed** collocation (and IC/BC points); **soft** IC/BC via MSE penalties; **weighted composite** loss vs. pure `data + α·physics` (see **pinn_pde.ipynb** / **pinn_ode.ipynb**). **Scattered field samples:** **`field_temperature_residual_fnn.ipynb`** maps **(x,y,z, loss, Tamb) → T** with a **residual FNN** and **train/val/test by CSV file**.",
     pitfalls: "Pure image-CNN on fields may ignore **geometry and multi-physics coupling**—open research vs. PINN/geometry-aware operators.",
   },
   tabular_hybrid: {
@@ -216,9 +216,10 @@ export const PATH_ENUM_PAIRS = {
   },
   field_tabular: {
     abundant:
-      "**Paths 31–32:** **CNN** or flattened **FNN** on fields → **FNN** head; **PINN** when physics known. *Enumeration:* CNN gives locality but **geometry + coupled multi-physics** embedding remains **open research**.",
+      "**Paths 31–32:** **CNN** or flattened **FNN** on fields → **FNN** head; **PINN** when physics known; **scattered (x,y,z)** probes + operating conditions → **T** via **residual FNN** (**`field_temperature_residual_fnn.ipynb`**). *Enumeration:* CNN gives locality but **geometry + coupled multi-physics** embedding remains **open research**.",
     scarce: "PINN + sparse labels; **multi-fidelity** or blended sources when available—physics residuals remain primary.",
-    workflow: "Field tensor → global pooling → regression; or PINN collocation + labels.",
+    workflow:
+      "**Gridded:** field tensor → global pooling → regression; **PINN:** collocation + labels. **Unstructured samples:** rows of \\((x,y,z,\\text{loss},\\mathrm{Tamb})\\) → **T** with **StandardScaler**, mini-batches, **ReduceLROnPlateau**—**`field_temperature_residual_fnn.ipynb`**.",
     pitfalls: "Treating field as plain image may miss **boundary conditions** and **PDE structure**.",
   },
   field_signal: {
@@ -318,6 +319,8 @@ const NB = {
   ensemble: "3_Ensemble_Learning/ensemle_learning.ipynb",
   nnBasics: "4_Neural_Network/Fundamentals/NN_basics.ipynb",
   nnGood: "4_Neural_Network/Good_Practices/good_practice_NN.ipynb",
+  fieldResidualFnn: "4_Neural_Network/Field_Data/field_temperature_residual_fnn.ipynb",
+  nnReadme: "4_Neural_Network/README.md",
   rnn: "4_Neural_Network/Signal_Domain/rnn_basics.ipynb",
   mdn: "4_Neural_Network/Multi_Modal_Distribution/mixture_density_net_ensemble_learning.ipynb",
   pinnOde: "5_PIML/PINN/pinn_ode.ipynb",
@@ -465,9 +468,13 @@ const MODEL_PAIRS = {
           "Depth/width, early stopping, **L1/L2**, learning rate schedules; always **scale features** for PE magnitudes.",
         tricks:
           "**Residual** connections and **LayerNorm** stabilize deeper MLPs on heterogeneous scales; compare against **Tabular Transformer** when column interactions are subtle.",
-        caseStudy: "DAB and buck NN surrogates vs. XGBoost in tutorial §VII.",
+        caseStudy:
+          "DAB and buck NN surrogates vs. XGBoost in tutorial §VII.; **3-D thermal samples** in **`field_temperature_residual_fnn.ipynb`** (per-CSV splits, residual FNN).",
         paper: PAPER.nn_scaling,
-        links: repoLinks([NB.buckNn, NB.nnBasics, NB.dabOne]),
+        links: repoLinks(
+          [NB.buckNn, NB.nnBasics, NB.dabOne, NB.fieldResidualFnn],
+          ["buck_modeling_NN.ipynb", "NN_basics.ipynb", "one_stop_AI_DAB_modulation.ipynb", "field_temperature_residual_fnn.ipynb (T-field CSVs)"]
+        ),
         external: [{ label: "PyTorch documentation — MLP", href: "https://pytorch.org/docs/stable/generated/torch.nn.Linear.html" }],
       },
     ],
@@ -559,9 +566,13 @@ const MODEL_PAIRS = {
           "**Output** is a **field tensor** aligned with targets (same **H×W** or a **super-resolution** target). **Loss** is **MSE/L1** on pixels (**supervised field regression**); optional **gradient** loss sharpens **interfaces**. Adding **PDE residuals** later turns the training objective into **physics-regularized** regression."
         ),
         tuning: "Convolution kernel sizes, depth; normalization layers.",
-        caseStudy: "**Magnetic modeling** notebooks use NN field mappings.",
+        caseStudy:
+          "**Magnetic modeling** (`magnet_fnn.ipynb`); **scattered 3-D thermal** points: **`field_temperature_residual_fnn.ipynb`**.",
         paper: "Field data section contrasts image-like treatment vs. geometry-aware modeling.",
-        links: repoLinks([NB.magnetFnn]),
+        links: repoLinks(
+          [NB.magnetFnn, NB.fieldResidualFnn],
+          ["magnet_fnn.ipynb", "field_temperature_residual_fnn.ipynb (x,y,z, loss, Tamb → T)"]
+        ),
         external: [],
       },
     ],
@@ -858,9 +869,13 @@ const MODEL_PAIRS = {
           "**Output:** **linear** **regression** or **softmax** **classification**. **Loss:** **MSE**/**CE** vs. **labels**; **focal**/**weighted** **CE** for **rare** **fault** **visuals**. **Physics** checks (e.g. **energy**) usually **post** **network**, not **in** **loss**, unless you **encode** them as **extra** **terms**."
         ),
         tuning: "Augment with physics-based normalization where possible.",
-        caseStudy: "**magnet_fnn.ipynb**, **magnet_lstm.ipynb**.",
+        caseStudy:
+          "**magnet_fnn.ipynb**, **magnet_lstm.ipynb**; **point-wise thermal regression:** **`field_temperature_residual_fnn.ipynb`**.",
         paper: "Field data section.",
-        links: repoLinks([NB.magnetFnn, NB.magnetLstm, NB.nnBasics]),
+        links: repoLinks(
+          [NB.magnetFnn, NB.magnetLstm, NB.nnBasics, NB.fieldResidualFnn],
+          ["magnet_fnn.ipynb", "magnet_lstm.ipynb", "NN_basics.ipynb", "field_temperature_residual_fnn.ipynb"]
+        ),
         external: [],
       },
     ],
@@ -924,11 +939,11 @@ const MODEL_PAIRS = {
           "**Output:** **target** **field** **same** **resolution** or **u(x,y)** **samples**. **Loss:** **MSE** on **labeled** **points** + **λ**·**PDE**² + **boundary** **terms**—**task** is **supervised** **field** **fitting** **with** **physics** **constraints**."
         ),
         tuning: "Boundary conditions in loss; weight scheduling.",
-        caseStudy: "PINN notebooks + magnetic examples.",
+        caseStudy: "PINN notebooks + magnetic examples; **supervised scattered field:** **`field_temperature_residual_fnn.ipynb`**.",
         paper: PAPER.piml_loss,
         links: repoLinks(
-          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.magnetFnn],
-          ["pinn_ode.ipynb", "pinn_pde.ipynb", "prior_integration_example.ipynb", "magnet_fnn.ipynb"]
+          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.magnetFnn, NB.fieldResidualFnn],
+          ["pinn_ode.ipynb", "pinn_pde.ipynb", "prior_integration_example.ipynb", "magnet_fnn.ipynb", "field_temperature_residual_fnn.ipynb"]
         ),
         external: [],
       },
@@ -1037,9 +1052,12 @@ const MODEL_PAIRS = {
           "**Output:** **multi-head**: e.g. **efficiency** **(regression)** + **hotspot** **prob** **(sigmoid)**. **Loss:** **weighted** **Σ L_k**—each **head** **has** **MSE**/**BCE** **matching** **its** **target**; **weights** **encode** **business** **priority**."
         ),
         tuning: "Resolution vs. batch size trade-offs.",
-        caseStudy: "Magnetic + PINN pieces combine conceptually.",
+        caseStudy: "Magnetic + PINN pieces combine conceptually; **thermal field branch** example: **`field_temperature_residual_fnn.ipynb`**.",
         paper: PAPER.piml_loss,
-        links: repoLinks([NB.magnetFnn, NB.pinn1]),
+        links: repoLinks(
+          [NB.magnetFnn, NB.pinn1, NB.fieldResidualFnn],
+          ["magnet_fnn.ipynb", "prior_integration_example.ipynb", "field_temperature_residual_fnn.ipynb"]
+        ),
         external: [],
       },
     ],
@@ -1802,7 +1820,7 @@ export const ARTICLE = {
     "**Graph** data encode **topological connectivity**, **locality**, and **multi-hop dependency**—relevant to topologies, PCBs, and layouts. **Graph-based representations** can generalize beyond treating layout as a single categorical code.",
 
   field_pe:
-    "**Field** samples pair coordinates with quantities (flux, temperature, stress). **Invariances** include **geometry** and **multi-physics laws** (often **PDEs**). Treating fields like plain images may **neglect physics and boundaries**—**geometry-aware** or **physics-informed** models are needed when fidelity matters.",
+    "**Field** samples pair coordinates with quantities (flux, temperature, stress). **Invariances** include **geometry** and **multi-physics laws** (often **PDEs**). **Downsampled point clouds** \\((x,y,z)\\) with global conditions (e.g. loss, ambient **T**) → local **T** are covered by **`field_temperature_residual_fnn.ipynb`**. Treating fields like plain images may **neglect physics and boundaries**—**geometry-aware** or **physics-informed** models are needed when fidelity matters.",
 
   hybrid_pe:
     "**Hybrid** inputs fuse modalities; **multi-branch** encoders and **fusion** (concat, gating, attention) are typical—balance capacity and **Occam’s razor** (justify complexity with gains).",
@@ -1933,6 +1951,7 @@ export function getRepoArticleAlignment(state, rec) {
     }
     if (/IGBT_Maintenance|rul_prediction/i.test(algoBlob)) push("9_Case_Studies_PE/IGBT_Maintenance", "VII-F");
     if (/Magnetic_Modeling|magnet_/i.test(algoBlob)) push("9_Case_Studies_PE/Magnetic_Modeling", "III-C; IV-F; IV-G");
+    if (/field_temperature_residual_fnn|Field_Data/i.test(algoBlob)) push("4_Neural_Network/Field_Data", "III-C; IV-F; IV-G");
   };
 
   const hasPann = algos.some((a) => /PANN|physics-in-architecture/i.test(`${a.name || ""} ${a.intro || ""}`));
@@ -1995,6 +2014,7 @@ export function getRepoArticleAlignment(state, rec) {
       push("3_Ensemble_Learning", "III-A; IV-D; IV-E");
     }
     if (m.hasSignal) push("4_Neural_Network/Signal_Domain", "III-C; IV-F; IV-G");
+    if (m.hasField) push("4_Neural_Network/Field_Data", "III-C; IV-F; IV-G");
     if (m.hasGraph) push("4_Neural_Network/Graph_NN", "III-E; IV-F");
     if (m.hasHybrid) push("4_Neural_Network/Multi_Modal_Distribution", "IV-E; IV-F");
     if (rec.flags?.piml) {

@@ -71,5 +71,6 @@ npx --yes serve -l 8765
 
 - **RL:** the course ships **7_Reinforcement_Learning/RL_buck_control.ipynb** (pedagogical **DQN**) and **7_Reinforcement_Learning/DDPG_buck_control.ipynb** (**DDPG**, same averaged-buck task). Broader RL at scale still often uses external libraries; the selector links Stable-Baselines3 where relevant.
 - **PINN:** **5_PIML/PINN/pinn_ode.ipynb** (Newton cooling ODE) and **5_PIML/PINN/pinn_pde.ipynb** (Burgers PDE) follow the same stability-oriented pattern: **fixed** collocation / IC grids, **soft** (MSE) constraints, **weighted composite** losses, **Adam** with gradient clipping + **ReduceLROnPlateau**, and optional **L-BFGS** polish.
+- **3D field / thermal maps:** **4_Neural_Network/Field_Data/field_temperature_residual_fnn.ipynb** trains a **residual FNN** on downsampled **`Tfield_*`** CSVs (`x,y,z,T`; **loss** and **Tamb** from filenames), with **per-file** train/val/test splits and 3-D residual plots—complements tabular FNN tutorials in the same chapter.
 - Some paths (e.g. full GNN training) point to external libraries or papers when the course has no matching notebook.
 - Notebook links in the app point to **`https://github.com/XinzeLee/Fundamentals_of_AI_for_PE/...`** — keep that repo public or change `REPO_ROOT` in `js/data.js`.

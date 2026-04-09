@@ -803,6 +803,7 @@ function renderResults(rec) {
         <li><a href="${ghBlob("4_Neural_Network/Good_Practices/good_practice_NN.ipynb")}" target="_blank" rel="noopener">good_practice_NN.ipynb</a> — regularization, normalization, train/val/test, hyperparameter workflow</li>
         <li><a href="${ghBlob("4_Neural_Network/Signal_Domain/rnn_basics.ipynb")}" target="_blank" rel="noopener">rnn_basics.ipynb</a> — RNN/LSTM/GRU/CNN/Transformer building blocks for sequences</li>
         <li><a href="${ghBlob("4_Neural_Network/Fundamentals/NN_basics.ipynb")}" target="_blank" rel="noopener">NN_basics.ipynb</a> — MLP fundamentals</li>
+        <li><a href="${ghBlob("4_Neural_Network/Field_Data/field_temperature_residual_fnn.ipynb")}" target="_blank" rel="noopener">field_temperature_residual_fnn.ipynb</a> — 3-D thermal field from CSVs (residual FNN, per-file train/val/test, schedulers)</li>
       </ul>
     </div>`;
   }
