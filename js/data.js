@@ -316,6 +316,7 @@ const NB = {
   moo: "1_MHA/Multi_Objective_MHA/multi_obj_MHA_master.ipynb",
   mhaReadme: "1_MHA/README.md",
   classic: "2_Classic_ML/classic_ML.ipynb",
+  gpBo: "2_Classic_ML/gaussian_process_bayesian_optimization.ipynb",
   ensemble: "3_Ensemble_Learning/ensemle_learning.ipynb",
   nnBasics: "4_Neural_Network/Fundamentals/NN_basics.ipynb",
   nnGood: "4_Neural_Network/Good_Practices/good_practice_NN.ipynb",
@@ -476,6 +477,27 @@ const MODEL_PAIRS = {
           ["buck_modeling_NN.ipynb", "NN_basics.ipynb", "one_stop_AI_DAB_modulation.ipynb", "field_temperature_residual_fnn.ipynb (T-field CSVs)"]
         ),
         external: [{ label: "PyTorch documentation — MLP", href: "https://pytorch.org/docs/stable/generated/torch.nn.Linear.html" }],
+      },
+      {
+        name: "Gaussian process regression (GP) + Bayesian optimization (BO)",
+        intro:
+          "A strong classical baseline when you need a **smooth surrogate** with **predictive uncertainty** on tabular features. GP posteriors provide a mean and variance, which can drive **active sampling** and **Bayesian optimization** loops when each simulation/experiment is expensive.",
+        architecture: arch(
+          "The **input layer** is a **scaled tabular vector** (design/operating features). GPs are most stable when features are standardized because kernel distances are scale-sensitive.",
+          "The **model** is a kernel machine: a **constant × RBF** kernel encodes smoothness with a characteristic length-scale. Training is typically either (a) marginal-likelihood optimization of kernel hyperparameters or (b) fixing hyperparameters and evaluating them in an outer loop.",
+          "The **output** is a Gaussian predictive distribution: **posterior mean** for point prediction and **posterior standard deviation** as an uncertainty proxy. BO uses an **acquisition** (e.g. expected improvement) to select the next hyperparameter/design point to evaluate."
+        ),
+        tuning:
+          "Kernel choice (RBF/Matern), length-scale bounds, noise level; exact GP fit scales as **O(n^3)** so use subsets or sparse approximations for large datasets.",
+        tricks:
+          "Plot predicted-vs-actual and residuals; check whether uncertainty bands widen in out-of-distribution regions. For BO, operate in **log-space** for positive hyperparameters (noise/length-scale).",
+        caseStudy:
+          "California housing regression + BO hyperparameter tuning notebook; transferable workflow for PE surrogate modeling and expensive optimization.",
+        paper: PAPER.nn_scaling,
+        links: repoLinks([NB.gpBo], ["gaussian_process_bayesian_optimization.ipynb"]),
+        external: [
+          { label: "scikit-learn — GaussianProcessRegressor", href: "https://scikit-learn.org/stable/modules/gaussian_process.html#gaussian-process-regression-gpr" },
+        ],
       },
     ],
   },
