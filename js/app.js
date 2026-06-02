@@ -8,14 +8,19 @@ import {
   buildControlRecommendation,
   buildFDDRecommendation,
   buildRULRecommendation,
-  getArticleSections,
-  getRepoArticleAlignment,
   FURTHER_READING,
+  getRepoArticleAlignment,
 } from "./data.js";
 
 /** @typedef {Record<string, string>} State */
 
 const state = /** @type {State} */ ({});
+
+const GENAI_GPT_URL =
+  "https://chatgpt.com/g/g-698618895c2481919e113c49bafe23ee-fundamentals-of-ai-for-pe";
+
+/** @type {ReturnType<typeof computeResults> | null} */
+let lastRec = null;
 
 let stepIndex = 0;
 /** @type {string[]} */
@@ -115,6 +120,38 @@ function renderProgress() {
 }
 
 /**
+ * Render `\(...\)`, `\[...\]`, `$...$`, and `$$...$$` with KaTeX when available.
+ * @param {string} html
+ */
+function renderMath(html) {
+  const renderTex = (tex, displayMode) => {
+    const trimmed = tex.trim();
+    const katexLib = typeof window !== "undefined" ? window.katex : null;
+    if (katexLib) {
+      try {
+        return katexLib.renderToString(trimmed, {
+          displayMode,
+          throwOnError: false,
+          strict: "ignore",
+        });
+      } catch {
+        /* fall through */
+      }
+    }
+    const fallback = escapeHtml(trimmed);
+    return displayMode
+      ? `<span class="math-fallback math-display">${fallback}</span>`
+      : `<span class="math-fallback math-inline">${fallback}</span>`;
+  };
+
+  return String(html)
+    .replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => `<span class="math-display">${renderTex(tex, true)}</span>`)
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_, tex) => `<span class="math-display">${renderTex(tex, true)}</span>`)
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, tex) => renderTex(tex, false))
+    .replace(/(^|[^\\$])\$([^$\n]+?)\$(?!\$)/g, (_, prefix, tex) => `${prefix}${renderTex(tex, false)}`);
+}
+
+/**
  * Convert **bold** and *italic* to HTML. If `html` is true, string may already contain tags — only apply markdown spans.
  * @param {string} raw
  * @param {{ html?: boolean }} [opts]
@@ -122,12 +159,10 @@ function renderProgress() {
 function formatRichText(raw, opts = {}) {
   if (raw == null) return "";
   const s = String(raw);
-  if (opts.html) {
-    return applyInlineMarkdown(s);
-  }
-  return applyInlineMarkdown(
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-  );
+  const escaped = opts.html
+    ? s
+    : s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return applyInlineMarkdown(renderMath(escaped));
 }
 
 /** @param {string} s */
@@ -520,8 +555,6 @@ function computeResults() {
     rec = { title: "Result", summary: "", algorithms: [], flags: {}, extras: {}, scarceHtml: "" };
   }
 
-  rec.articleSections = getArticleSections(state, rec);
-  rec.repoAlignment = getRepoArticleAlignment(state, rec);
   return rec;
 }
 
@@ -550,6 +583,76 @@ function tuningExcerptForGlance(md) {
   return parts.slice(0, 2).join(". ") + ".";
 }
 
+function algorithmSectionRefs(algorithm) {
+  const text = stripMarkdown(`${algorithm.paper || ""} ${algorithm.caseStudy || ""}`);
+  const secRefs = new Set();
+  const secPattern = /Sec\.\s*[IVX0-9]+(?:-[A-Z])?/gi;
+  for (const m of text.matchAll(secPattern)) secRefs.add(m[0].replace(/\s+/g, " ").trim());
+  return [...secRefs].slice(0, 3);
+}
+
+function algorithmCategory(algorithm) {
+  const text = `${algorithm.name || ""} ${algorithm.intro || ""} ${algorithm.paper || ""}`.toLowerCase();
+  if (text.includes("reinforcement") || text.includes("ddpg") || text.includes("dqn") || text.includes("sac")) return "rl";
+  if (text.includes("pso") || text.includes("genetic algorithm") || text.includes("nsga") || text.includes("annealing") || text.includes("meta-heur")) return "mha";
+  if (text.includes("xgboost") || text.includes("random forest") || text.includes("svm") || text.includes("knn") || text.includes("classic ml")) return "classic";
+  if (text.includes("pinn") || text.includes("pann") || text.includes("physics-informed")) return "piml";
+  if (text.includes("graph") || text.includes("gcn") || text.includes("gat")) return "gnn";
+  if (text.includes("rul")) return "rul";
+  if (text.includes("fdd") || text.includes("fault") || text.includes("anomaly")) return "fdd";
+  return "nn";
+}
+
+function reviewAlignmentSummary(algorithm, rec) {
+  if (algorithm.reviewAlignment) return algorithm.reviewAlignment;
+  const refs = algorithmSectionRefs(algorithm);
+  const refsText = refs.length ? ` (${refs.join(", ")})` : "";
+  const cat = algorithmCategory(algorithm);
+  const source = stripMarkdown(`${algorithm.name || ""} ${algorithm.caseStudy || ""} ${algorithm.paper || ""}`);
+  const lower = source.toLowerCase();
+  const caseBits = [];
+  if (lower.includes("buck")) caseBits.push("buck converter design/control");
+  if (lower.includes("dab")) caseBits.push("DAB modulation, stress, ZVS, or time-domain modeling");
+  if (lower.includes("tinyml")) caseBits.push("DAB TinyML deployment");
+  if (lower.includes("igbt") || lower.includes("rul")) caseBits.push("IGBT RUL prognostics");
+  if (lower.includes("magnet")) caseBits.push("magnetic core-loss modeling");
+  if (lower.includes("field_temperature") || lower.includes("thermal")) caseBits.push("3-D thermal field prediction");
+  if (lower.includes("pe-gpt") || lower.includes("agentic")) caseBits.push("PE-GPT-style tool workflows");
+  const appText = caseBits.length ? ` The directly related application context is ${caseBits.join("; ")}.` : "";
+  const scarceText = rec?.scarceHtml ? " Because this branch may involve scarce labels, the review article points toward simpler baselines, transfer, or physics constraints before larger models." : "";
+  const summaryMap = {
+    rl: `The review article discusses RL as reward-driven controller or optimizer learning, so this recommendation should be read through state/action design, reward terms, safe constraints, and repeated-seed evaluation${refsText}.${appText}`,
+    mha: `The review article discusses MHA use in PE design search where objective/constraint definition, exploration-exploitation scheduling, and statistical comparison decide whether an apparent optimum is trustworthy${refsText}.${appText}`,
+    classic: `The review article uses classic ML and ensembles as practical baselines for structured PE data; EDA, feature scaling, operating-region coverage, and calibration often matter as much as model choice${refsText}.${appText}${scarceText}`,
+    piml: `The review article discusses physics-informed learning as a way to combine sparse data with known PE laws; for this recommendation, loss-term weighting and boundary/initial condition consistency are central${refsText}.${appText}`,
+    gnn: `The review article motivates graph methods when PE topology, layout, or connectivity cannot be reduced to a single categorical label; validation should preserve node/edge meaning and multi-hop effects${refsText}.${appText}`,
+    fdd: `The review article frames FDD around task definition and data representation first: label type, false-alarm cost, class imbalance, and modality choice determine how this algorithm should be evaluated${refsText}.${appText}`,
+    rul: `The review article discusses RUL as degradation-trajectory modeling where uncertainty and split strategy matter; this recommendation should be checked against sparse regimes and trajectory-level validation${refsText}.${appText}`,
+    nn: `The review article ties NN choice to PE data modality and learning target: define input structure, network body, output/loss, and validation split before increasing model complexity${refsText}.${appText}${scarceText}`,
+  };
+  return summaryMap[cat];
+}
+
+function reviewTuningGuide(algorithm) {
+  const cat = algorithmCategory(algorithm);
+  const tuneMap = {
+    rl: "Tune reward terms first (tracking, loss, constraints), then stabilize training with replay/target updates and repeated-seed comparison before hardware tests.",
+    mha: "Tune population size/step schedules around exploration→exploitation; evaluate robustness by repeated runs and use statistics for fair algorithm comparison.",
+    classic:
+      "Start with EDA-driven feature cleanup and scaling, then tune model complexity with validation splits that reflect operating regimes; check calibration, not accuracy alone.",
+    piml:
+      "Tune data-loss vs physics-loss weighting and boundary/initial condition terms together; monitor both physical consistency and prediction error during training.",
+    gnn:
+      "Tune depth/readout to avoid over-smoothing; keep node/edge feature definitions physically meaningful and validate graph-size generalization.",
+    fdd:
+      "Tune thresholds and class weights against false-alarm cost; for multi-label tasks, calibrate per-label decision thresholds instead of one global cutoff.",
+    rul:
+      "Tune sequence window length and split strategy by degradation trajectory; for probabilistic heads, verify calibration and uncertainty growth in sparse regions.",
+    nn: "Tune baseline width/depth with early stopping and regularization first; only add complexity after clear validation gains across operating conditions.",
+  };
+  return tuneMap[cat];
+}
+
 /**
  * @param {string | { input?: string, hidden?: string, outputLoss?: string } | undefined} architecture
  * @param {"glance" | "card"} variant
@@ -564,9 +667,9 @@ function renderArchitectureHtml(architecture, variant) {
   const hidden = architecture.hidden || "";
   const out = architecture.outputLoss || "";
   const blocks = [
-    { k: "Input layer & modality interface", t: input },
-    { k: "Hidden layers & data invariants", t: hidden },
-    { k: "Output layer, loss & learning task", t: out },
+    { k: "Inputs (what you measure or set)", t: input },
+    { k: "Core model (how it learns patterns)", t: hidden },
+    { k: "Outputs and training target", t: out },
   ].filter((x) => String(x.t).trim());
   if (!blocks.length) return "";
   return `<div class="${wrapClass}">${blocks
@@ -607,15 +710,14 @@ function renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly) 
       .join("");
     return reportBlock(
       "Recommended algorithms",
-      `<p class="recommend-glance-lede">Start here: <strong>named methods</strong> and, for neural recommendations, three layers of detail—how the <strong>input layer</strong> interfaces <strong>data modalities</strong>, how <strong>hidden</strong> structure reflects <strong>invariants</strong>, and how <strong>outputs + loss</strong> tie to the <strong>learning task</strong>. Supporting tutorial excerpts and repo mapping come <strong>after</strong> the detailed cards below.</p>
-      <ol class="recommend-glance-list">${items}</ol>`,
+      `<ol class="recommend-glance-list">${items}</ol>`,
       "report-section--recommend"
     );
   }
   if (promotePathOnly && String(pathDetailHtml).trim()) {
     return reportBlock(
       "Recommended approaches for this path",
-      `<p class="recommend-glance-lede">This branch has no separate algorithm cards—the items below are your <strong>primary</strong> guidance (model families, workflow, pitfalls). Tutorial cross-checks follow afterward.</p>
+      `<p class="recommend-glance-lede">This branch has no separate algorithm cards—the items below are your <strong>primary</strong> guidance (model families, workflow, pitfalls).</p>
       <div class="recommend-glance-path-wrap">${pathDetailHtml}</div>`,
       "report-section--recommend"
     );
@@ -623,74 +725,62 @@ function renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly) 
   return "";
 }
 
-/**
- * Tutorial article excerpts: subsection titles + paragraphs (body may contain multiple \\n\\n).
- * @param {{ title: string, body: string }[] | undefined} sections
- */
-function renderArticleSections(sections) {
-  if (!sections?.length) return "";
-  const blocks = sections
-    .map((sec, i) => {
-      const paras = String(sec.body)
-        .split(/\n\n+/)
-        .map((p) => p.trim())
-        .filter(Boolean)
-        .map((p) => `<p>${formatRichText(p)}</p>`)
-        .join("");
-      return `<section class="article-snippet" aria-labelledby="article-snippet-${i}">
-        <h4 class="article-snippet-title" id="article-snippet-${i}">${escapeHtml(sec.title)}</h4>
-        <div class="article-snippet-body">${paras}</div>
-      </section>`;
-    })
-    .join("");
-  return reportBlock(
-    "Discussion in the tutorial article",
-    `${blocks}<p class="article-cite"><cite>Excerpts abridged from the invited tutorial: Xinze Li et al., “Fundamentals of Artificial Intelligence for Power Electronics,” <em>IEEE Trans. Ind. Electron.</em>, 2026.</cite></p>`
-  );
+function dedupeLinks(links) {
+  const seen = new Set();
+  return (links || []).filter((l) => {
+    if (!l?.href || seen.has(l.href)) return false;
+    seen.add(l.href);
+    return true;
+  });
 }
 
-/**
- * @param {{ folder: string, sections: string, href: string }[] | undefined} rows
- */
-function renderRepoAlignment(rows) {
-  if (!rows?.length) return "";
-  const tbody = rows
+function renderReadingSequence(rec) {
+  const repoRows = getRepoArticleAlignment(state, rec);
+  const algoLinks = dedupeLinks((rec.algorithms || []).flatMap((a) => a.links || []));
+  const notebookLinks = algoLinks.filter((l) => /\.ipynb/i.test(`${l.href} ${l.label}`));
+  const readmeLinks = algoLinks.filter((l) => !notebookLinks.includes(l));
+  const repoList = repoRows
     .map(
       (r) =>
-        `<tr><td><a href="${r.href}" target="_blank" rel="noopener">${escapeHtml(r.folder)}</a></td><td>${escapeHtml(r.sections)}</td></tr>`
+        `<li><a href="${r.href}" target="_blank" rel="noopener">${escapeHtml(r.folder)}</a> <span class="reading-meta">${escapeHtml(
+          r.sections
+        )}</span></li>`
     )
     .join("");
-  const note = `<p class="repo-alignment-note">Matches the <strong>Alignment with the tutorial article</strong> section in the course repo README, filtered to folders relevant to this recommendation (modalities, technique flags, and notebook links).</p>
-    <p class="repo-alignment-note"><a href="${ghBlob("README.md")}" target="_blank" rel="noopener">Fundamentals_of_AI_for_PE — root README</a> · <a href="${REPO_ROOT}" target="_blank" rel="noopener">Repository</a></p>`;
-  return reportBlock(
-    "Course repository ↔ tutorial article",
-    `<table class="repo-alignment-table" role="table">
-      <thead><tr><th scope="col">Course repo folder</th><th scope="col">Tutorial article (sections)</th></tr></thead>
-      <tbody>${tbody}</tbody>
-    </table>${note}`
-  );
+  const notebookList = [...notebookLinks, ...readmeLinks]
+    .map((l) => `<li><a href="${l.href}" target="_blank" rel="noopener">${escapeHtml(l.label)}</a></li>`)
+    .join("");
+
+  return `<div class="extras-box reading-sequence-box">
+    <h3 class="extras-h3">Recommended review article and GitHub reading path</h3>
+    <ol class="reading-sequence">
+      <li><strong>What (Sec. I–II):</strong> Start with the What–Which–How framework and PE data modalities. Identify your lifecycle phase (design / control / maintenance), specific task, and data format (tabular, signal, field, graph, hybrid).</li>
+      <li><strong>Which (Sec. III–VI):</strong> Use the algorithm card to check input representation, model body, output head, and loss against your PE objective. Match the recommended model family to your data modality and learning type.</li>
+      <li><strong>How (Sec. III–VI):</strong> Open each card's <strong>Tuning & validation (full)</strong> box and follow the review-article tuning checklist. Apply PE-specific practices: feature scaling, EDA, physics-informed constraints, and statistical comparison across runs.</li>
+      <li><strong>Case studies (Sec. VII):</strong> Finish with the closest D1–D7 notebook and reproduce the end-to-end workflow before adapting it to your hardware or dataset.</li>
+    </ol>
+    ${
+      repoList
+        ? `<div class="report-subsection"><h4 class="report-h4">Relevant review sections and repo folders</h4><ol class="reading-link-list">${repoList}</ol></div>`
+        : ""
+    }
+    ${
+      notebookList
+        ? `<div class="report-subsection"><h4 class="report-h4">Notebook / README order for this result</h4><ol class="reading-link-list">${notebookList}</ol></div>`
+        : ""
+    }
+  </div>`;
 }
 
 function renderResults(rec) {
+  lastRec = rec;
   el("results-panel").hidden = false;
   el("wizard-panel").querySelector("#step-container").innerHTML = "";
   el("btn-next").hidden = true;
   el("btn-back").hidden = true;
   el("btn-restart").hidden = false;
 
-  const pathLine =
-    rec.pathId != null
-      ? `<div class="path-badge" title="Tutorial path enumeration">Path ${rec.pathId} · enumerated in the tutorial</div>`
-      : `<div class="path-badge">Workflow branch (not a single numbered path)</div>`;
-
   const summary = el("results-summary");
-
-  const pills = [];
-  if (rec.flags?.nn) pills.push(`<span class="pill nn">Neural networks</span>`);
-  if (rec.flags?.mha) pills.push(`<span class="pill mha">Meta-heuristics</span>`);
-  if (rec.flags?.tinyml) pills.push(`<span class="pill tinyml">TinyML / edge</span>`);
-  if (rec.flags?.piml) pills.push(`<span class="pill piml">Physics-informed ML</span>`);
-  const pillsHtml = pills.length ? `<div class="flag-strip">${pills.join("")}</div>` : "";
 
   let pathDetailHtml = "";
   if (rec.pathEnumAbundant || rec.pathEnumScarce || rec.pathWorkflow || rec.pathPitfalls) {
@@ -707,28 +797,17 @@ function renderResults(rec) {
       pathDetailHtml += `<div class="report-subsection"><h4 class="report-h4">Pitfalls & checks</h4><p>${formatRichText(rec.pathPitfalls)}</p></div>`;
     }
   }
-
   const hasAlgoCards = (rec.algorithms || []).length > 0;
   const promotePathOnly = !hasAlgoCards && String(pathDetailHtml).trim().length > 0;
-  const pathDetailForContext = promotePathOnly ? "" : pathDetailHtml;
 
   const hero = `<header class="report-hero">
     <h3 class="report-title">${escapeHtml(rec.title || "Report")}</h3>
-    ${pathLine}
   </header>`;
-
-  const tutorialContextHtml =
-    renderArticleSections(rec.articleSections) +
-    renderRepoAlignment(rec.repoAlignment) +
-    reportBlock("This modality path in detail", pathDetailForContext) +
-    reportBlock("Paper cross-checks", rec.reviewContextHtml ? formatRichText(rec.reviewContextHtml, { html: true }) : "");
 
   summary.innerHTML = `${hero}
     ${renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly)}
     ${reportBlock("Situation & goal", rec.summary ? `<p class="report-lede">${formatRichText(rec.summary)}</p>` : "")}
-    ${reportBlock("Label / data regime", rec.scarceHtml ? formatRichText(rec.scarceHtml, { html: true }) : "")}
-    ${reportBlock("Techniques in scope", pillsHtml)}
-    ${reportBlock("Standard workflow (tutorial)", rec.tutorialPipelineHtml ? formatRichText(rec.tutorialPipelineHtml, { html: true }) : "")}`;
+    ${reportBlock("Label / data regime", rec.scarceHtml ? formatRichText(rec.scarceHtml, { html: true }) : "")}`;
 
   const flagsEl = el("results-flags");
   flagsEl.innerHTML = "";
@@ -739,13 +818,12 @@ function renderResults(rec) {
 
   if (hasAlgoCards) {
     h += `<div class="report-body-intro">
-      <h2 class="report-part-title">Algorithm details & course materials</h2>
-      <p class="report-part-lede">Each card expands the same recommendation with <strong>full tuning guidance</strong>, <strong>tutorial cases</strong>, <strong>how this aligns with the paper</strong>, and <strong>notebook links</strong>. After the cards: article excerpts, repo mapping, path notes, and cross-checks.</p>
+      <h2 class="report-part-title">Algorithm details & GitHub Jupyter Notebook materials</h2>
     </div>`;
   } else {
     h += `<div class="report-body-intro">
       <h2 class="report-part-title">Deeper context & resources</h2>
-      <p class="report-part-lede">Your main path guidance is in <strong>Recommended approaches for this path</strong> above. Below: tutorial discussion, course folder mapping, paper cross-checks, and further reading.</p>
+      <p class="report-part-lede">Your main path guidance is in <strong>Recommended approaches for this path</strong> above. Below: further reading and GitHub Jupyter Notebook materials.</p>
     </div>`;
   }
 
@@ -758,12 +836,10 @@ function renderResults(rec) {
       .join("");
     const introH = formatRichText(a.intro || "");
     const tuningH = formatRichText(a.tuning || "");
-    const tricksH = a.tricks ? formatRichText(a.tricks) : "";
+    const tuningHint = a.tuning ? formatRichText(tuningExcerptForGlance(a.tuning)) : "";
+    const tuningGuideH = formatRichText(reviewTuningGuide(a));
     const caseH = formatRichText(a.caseStudy || "");
-    const paperH = formatRichText(a.paper || "");
-    const tricksSecRendered = a.tricks
-      ? `<section class="algo-sec"><h4 class="algo-h4">Practical tips</h4><p>${tricksH}</p></section>`
-      : "";
+    const paperH = formatRichText(reviewAlignmentSummary(a, rec));
     const archSec = a.architecture
       ? `<section class="algo-sec algo-sec--arch"><h4 class="algo-h4">Architecture & learning objective</h4>${renderArchitectureHtml(a.architecture, "card")}</section>`
       : "";
@@ -771,22 +847,23 @@ function renderResults(rec) {
       <h3 class="algo-title">${escapeHtml(a.name)}</h3>
       <section class="algo-sec"><h4 class="algo-h4">What to use & why</h4><p>${introH}</p></section>
       ${archSec}
-      <section class="algo-sec"><h4 class="algo-h4">Tuning & validation (full)</h4><p>${tuningH}</p></section>
-      ${tricksSecRendered}
-      <section class="algo-sec"><h4 class="algo-h4">Tutorial case</h4><p>${caseH}</p></section>
-      <section class="algo-sec"><h4 class="algo-h4">Paper alignment</h4><p class="paper-note">${paperH}</p></section>
-      <section class="algo-sec"><h4 class="algo-h4">Course repository</h4><ul class="link-list">${links || "<li><em>No bundled notebook — use external links.</em></li>"}</ul></section>
+      <details class="algo-details algo-details--tuning">
+        <summary>Tuning & validation (full)</summary>
+        <div class="algo-details-body">
+          <p>${tuningH}</p>
+          <p class="paper-note"><strong>Review article tuning guide:</strong> ${tuningGuideH}</p>
+          ${tuningHint ? `<p class="paper-note paper-note--extra"><strong>Quick tuning checklist:</strong> ${tuningHint}</p>` : ""}
+          <p class="paper-note paper-note--extra"><strong>Validation check:</strong> compare against a simple baseline, use operating-range-aware splits, and confirm conclusions on held-out PE conditions.</p>
+        </div>
+      </details>
+      <section class="algo-sec"><h4 class="algo-h4">GitHub notebook example</h4><p>${caseH}</p></section>
+      <section class="algo-sec"><h4 class="algo-h4">Review article alignment</h4><p class="paper-note">${paperH}</p></section>
+      <section class="algo-sec"><h4 class="algo-h4">GitHub Jupyter Notebook Materials</h4><ul class="link-list">${links || "<li><em>No bundled notebook — use external links.</em></li>"}</ul></section>
       ${ext ? `<section class="algo-sec"><h4 class="algo-h4">External references</h4><ul class="link-list">${ext}</ul></section>` : ""}
     </article>`;
   });
 
-  if (tutorialContextHtml.trim()) {
-    h += `<div class="report-context-wrap">
-      <h2 class="report-part-title">Tutorial context & cross-checks</h2>
-      <p class="report-part-lede">Article excerpts, course-to-paper mapping, path notes, and paper reminders—<strong>after</strong> the algorithm recommendations above.</p>
-      ${tutorialContextHtml}
-    </div>`;
-  }
+  h += renderReadingSequence(rec);
 
   if (rec.customBlocks) {
     rec.customBlocks.forEach((b) => {
@@ -794,64 +871,11 @@ function renderResults(rec) {
     });
   }
 
-  /* Extras: NN good practices */
-  if (rec.extras?.nn) {
-    h += `<div class="extras-box">
-      <h3 class="extras-h3">Neural networks — cross-cutting course notes</h3>
-      <p>${formatRichText(GLOSSARY.nn_practice)}</p>
-      <ul class="link-list">
-        <li><a href="${ghBlob("4_Neural_Network/Good_Practices/good_practice_NN.ipynb")}" target="_blank" rel="noopener">good_practice_NN.ipynb</a> — regularization, normalization, train/val/test, hyperparameter workflow</li>
-        <li><a href="${ghBlob("4_Neural_Network/Signal_Domain/rnn_basics.ipynb")}" target="_blank" rel="noopener">rnn_basics.ipynb</a> — RNN/LSTM/GRU/CNN/Transformer building blocks for sequences</li>
-        <li><a href="${ghBlob("4_Neural_Network/Fundamentals/NN_basics.ipynb")}" target="_blank" rel="noopener">NN_basics.ipynb</a> — MLP fundamentals</li>
-        <li><a href="${ghBlob("4_Neural_Network/Field_Data/field_temperature_residual_fnn.ipynb")}" target="_blank" rel="noopener">field_temperature_residual_fnn.ipynb</a> — 3-D thermal field from CSVs (residual FNN, per-file train/val/test, schedulers)</li>
-      </ul>
-    </div>`;
-  }
-
-  if (rec.extras?.mha) {
-    h += `<div class="extras-box">
-      <h3 class="extras-h3">Meta-heuristics — cross-cutting course notes</h3>
-      <p>${formatRichText(GLOSSARY.mha_tuning)}</p>
-      <ul class="link-list">
-        <li><a href="${ghBlob("1_MHA/Single_Objective_MHA/pso_hyp_tuning.ipynb")}" target="_blank" rel="noopener">pso_hyp_tuning.ipynb</a></li>
-        <li><a href="${ghBlob("1_MHA/Single_Objective_MHA/sing_obj_MHA.ipynb")}" target="_blank" rel="noopener">sing_obj_MHA.ipynb</a></li>
-        <li><a href="${ghBlob("1_MHA/Single_Objective_MHA/algorithm_stats_compare.ipynb")}" target="_blank" rel="noopener">algorithm_stats_compare.ipynb</a> — statistical comparison</li>
-        <li><a href="${ghBlob("1_MHA/Multi_Objective_MHA/multi_obj_MHA_master.ipynb")}" target="_blank" rel="noopener">multi_obj_MHA_master.ipynb</a></li>
-        <li><a href="${ghBlob("1_MHA/README.md")}" target="_blank" rel="noopener">1_MHA/README.md</a></li>
-      </ul>
-    </div>`;
-  }
-
-  if (rec.extras?.tinyml) {
-    h += `<div class="extras-box">
-      <h3 class="extras-h3">TinyML & edge deployment</h3>
-      <p>Prefer shallow-wide networks at similar parameter counts for latency; consider quantization, pruning with <strong>L1</strong>, ONNX Runtime / TensorFlow Lite — as in the tutorial’s adaptive modulation example.</p>
-      <ul class="link-list">
-        <li><a href="${ghBlob("9_Case_Studies_PE/DAB_Design/Adaptive_Modulation/TinyML.ipynb")}" target="_blank" rel="noopener">TinyML.ipynb</a></li>
-        <li><a href="${ghBlob("9_Case_Studies_PE/DAB_Design/Performance_Modeling_and_Design/one_stop_AI_DAB_modulation.ipynb")}" target="_blank" rel="noopener">one_stop_AI_DAB_modulation.ipynb</a> (related workflow)</li>
-      </ul>
-    </div>`;
-  }
-
-  if (rec.extras?.piml) {
-    h += `<div class="extras-box">
-      <h3 class="extras-h3">Physics-informed ML — course entry points</h3>
-      <p>${formatRichText(GLOSSARY.piml)}</p>
-      <ul class="link-list">
-        <li><a href="${ghBlob("5_PIML/PINN/pinn_ode.ipynb")}" target="_blank" rel="noopener">pinn_ode.ipynb</a> — cooling ODE; learnable positive <strong>k</strong> via <code>exp(log k)</code>; fixed grids, soft IC, weighted composite loss, Adam + clip + plateau + optional L-BFGS</li>
-        <li><a href="${ghBlob("5_PIML/PINN/pinn_pde.ipynb")}" target="_blank" rel="noopener">pinn_pde.ipynb</a> — Burgers PDE; same stability-oriented training pattern as <code>pinn_ode</code></li>
-        <li><a href="${ghBlob("5_PIML/PINN/prior_integration_example.ipynb")}" target="_blank" rel="noopener">prior_integration_example.ipynb</a></li>
-        <li><a href="${ghBlob("5_PIML/PANN/README.md")}" target="_blank" rel="noopener">PANN/README.md</a></li>
-        <li><a href="${ghBlob("5_PIML/README.md")}" target="_blank" rel="noopener">5_PIML/README.md</a></li>
-      </ul>
-    </div>`;
-  }
-
   h += `<div class="extras-box extras-further">
     <h3 class="extras-h3">Further reading</h3>
     <ul class="link-list">
       ${FURTHER_READING.map((x) => `<li><a href="${x.href}" target="_blank" rel="noopener">${x.label}</a></li>`).join("")}
-      <li><a href="${REPO_ROOT}" target="_blank" rel="noopener">Public course repo (when released)</a></li>
+      <li><a href="${REPO_ROOT}" target="_blank" rel="noopener">Fundamentals_of_AI_for_PE on GitHub</a></li>
     </ul>
   </div>`;
 
@@ -888,6 +912,7 @@ function goBack() {
 
 function restart() {
   Object.keys(state).forEach((k) => delete state[k]);
+  lastRec = null;
   stepIndex = 0;
   flow = buildFlow();
   el("results-panel").hidden = true;
@@ -899,6 +924,256 @@ function restart() {
 el("btn-next").addEventListener("click", goNext);
 el("btn-back").addEventListener("click", goBack);
 el("btn-restart").addEventListener("click", restart);
+
+/** Strip markdown markers for plain-text assistant prompts. */
+function stripMarkdown(raw) {
+  return String(raw || "")
+    .replace(/\*\*([\s\S]+?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*([^*\n]+?)\*/g, "$1")
+    .replace(/\\(\(|\)|\[|\])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Human-readable labels for wizard answers. */
+function describeWizardStep(stepId, s) {
+  const modality = {
+    tabular: "Tabular",
+    signal: "Signal-domain",
+    graph: "Graph",
+    field: "Field",
+    hybrid: "Hybrid",
+  };
+
+  /** @type {Record<string, [string, string | undefined]>} */
+  const map = {
+    phase: ["Lifecycle phase", { design: "Design", control: "Control", maintenance: "Maintenance" }[s.phase]],
+    design_goal: [
+      "Design-phase goal",
+      { modeling: "Surrogate modeling", optimization: "Optimization", process: "Process automation" }[s.designGoal],
+    ],
+    model_in: ["Modeling — input modality", modality[s.modelIn]],
+    model_out: ["Modeling — output modality", modality[s.modelOut]],
+    model_scarce: ["Modeling — labeled data", s.modelScarce ? "Scarce" : s.modelScarce === false ? "Abundant" : undefined],
+    opt_dim: ["Optimization scale", s.optDim === "high" ? "High-dimensional (>100D) — RL" : s.optDim === "low" ? "Low-dimensional — MHAs" : undefined],
+    rl_space: [
+      "RL action space",
+      { cont: "Continuous (DDPG, SAC, …)", disc: "Discrete (DQN, …)", hyb: "Hybrid" }[s.rlSpace],
+    ],
+    opt_moo: ["Optimization objectives", s.optMoo ? "Multi-objective (Pareto)" : s.optMoo === false ? "Single objective" : undefined],
+    opt_space: [
+      "Search space structure",
+      { cont: "Continuous (PSO, DE, NSGA-II/III, …)", disc: "Discrete (SA, ACO, …)", hyb: "Hybrid mixed (GA, …)" }[s.optSpace],
+    ],
+    process_kind: [
+      "Process automation focus",
+      s.processKind === "sim" ? "Simulation automation (LTspice, PLECS, MATLAB batching)" : s.processKind === "agent" ? "Agentic AI (LLM + tools + RAG)" : undefined,
+    ],
+    control_mode: [
+      "Control role",
+      s.controlMode === "controller" ? "AI as controller" : s.controlMode === "assist" ? "Assist control design" : undefined,
+    ],
+    control_policy: [
+      "Controller learning paradigm",
+      s.controlPolicy === "rl" ? "RL (new trajectories from rewards)" : s.controlPolicy === "imitation" ? "Imitation / supervised NN" : undefined,
+    ],
+    control_deploy: [
+      "Deployment target",
+      s.controlDeploy === "online" ? "Online on hardware / edge (TinyML considerations)" : s.controlDeploy === "offline" ? "Offline / lab analysis" : undefined,
+    ],
+    assist_branch: [
+      "Assist-control branch",
+      s.assistBranch === "modeling" ? "Control performance modeling" : s.assistBranch === "optimization" ? "Control optimization" : undefined,
+    ],
+    maint_kind: [
+      "Maintenance objective",
+      { fdd: "Fault detection & diagnosis", sid: "System identification", rul: "Remaining useful life (RUL)" }[s.maintKind],
+    ],
+    fdd_sup: [
+      "FDD label availability",
+      {
+        labeled: "Labeled faults / health states",
+        unlabeled: "Mostly unlabeled (anomaly detection)",
+        ssl: "Few labels + abundant unlabeled (semi-supervised)",
+      }[s.fddSup],
+    ],
+    fdd_task: [
+      "FDD task type",
+      { binary: "Binary (normal vs fault)", multiclass: "Multi-class", multilabel: "Multi-label (co-occurring faults)" }[s.fddTask],
+    ],
+    fdd_modality: [
+      "FDD measurement modality",
+      {
+        tabular: "Tabular features",
+        signal: "Signal-domain (waveforms / spectra)",
+        graph: "Graph (topology / layout)",
+        unstructured: "Unstructured (images, text, thermal photos)",
+      }[s.fddModality],
+    ],
+    sid_in: ["System ID — input modality", modality[s.sidIn]],
+    sid_out: ["System ID — output modality", modality[s.sidOut]],
+    sid_scarce: ["System ID — labeled data", s.sidScarce ? "Scarce" : s.sidScarce === false ? "Abundant" : undefined],
+    rul_in: [
+      "RUL model inputs",
+      { tabular: "Tabular health indicators", signal: "Signal-domain degradation trajectories", hybrid: "Hybrid modalities" }[s.rulIn],
+    ],
+    rul_prob: ["RUL uncertainty", s.rulProb ? "Probabilistic (mean + variance / mixture)" : s.rulProb === false ? "Deterministic point estimate" : undefined],
+  };
+
+  const row = map[stepId];
+  if (!row || !row[1]) return null;
+  return `- ${row[0]}: ${row[1]}`;
+}
+
+/** @param {State} s @param {ReturnType<typeof computeResults> | null} rec */
+function buildGenAiPrompt(s, rec) {
+  const flowSteps = buildFlow();
+  const selectionLines = flowSteps.map((stepId) => describeWizardStep(stepId, s)).filter(Boolean);
+
+  const parts = [
+    "I'm using the Fundamentals of AI for PE — Algorithm Selector (companion to the IEEE TIE review article and the Fundamentals_of_AI_for_PE GitHub Jupyter Notebook Materials repo).",
+    "",
+    "## My wizard selections",
+    ...(selectionLines.length ? selectionLines : ["- (No selections recorded yet — please complete the wizard first.)"]),
+  ];
+
+  if (rec) {
+    parts.push("", "## Selector report");
+    if (rec.pathId != null) parts.push(`- Path ID: ${rec.pathId}`);
+    if (rec.title) parts.push(`- Report title: ${stripMarkdown(rec.title)}`);
+    if (rec.summary) parts.push(`- Situation & goal: ${stripMarkdown(rec.summary)}`);
+
+    const flags = [];
+    if (rec.flags?.nn) flags.push("Neural networks");
+    if (rec.flags?.mha) flags.push("Meta-heuristics");
+    if (rec.flags?.tinyml) flags.push("TinyML / edge deployment");
+    if (rec.flags?.piml) flags.push("Physics-informed ML");
+    if (flags.length) parts.push(`- Technique flags: ${flags.join("; ")}`);
+
+    if (rec.algorithms?.length) {
+      parts.push("", "## Recommended algorithms (from selector)");
+      rec.algorithms.forEach((a, i) => {
+        parts.push(`${i + 1}. ${a.name}`);
+        if (a.intro) parts.push(`   Why: ${stripMarkdown(a.intro)}`);
+        if (a.tuning) parts.push(`   Tuning essentials: ${stripMarkdown(a.tuning)}`);
+        parts.push(`   Review-article tuning guide: ${stripMarkdown(reviewTuningGuide(a))}`);
+        parts.push(`   Review article alignment summary: ${stripMarkdown(reviewAlignmentSummary(a, rec))}`);
+        if (a.caseStudy) parts.push(`   GitHub notebook example: ${stripMarkdown(a.caseStudy)}`);
+      });
+    }
+
+    const readingRows = getRepoArticleAlignment(s, rec);
+    const algoLinks = dedupeLinks((rec.algorithms || []).flatMap((a) => a.links || []));
+    if (readingRows.length || algoLinks.length) {
+      parts.push("", "## Recommended review article and GitHub reading path");
+      parts.push("1. Basics: use review article Sec. I–II for What–Which–How and PE data modalities.");
+      parts.push("2. Structure/loss: inspect each algorithm card's input, model body, output head, and loss.");
+      parts.push("3. Tuning: use each algorithm's review-article tuning guide before comparing methods.");
+      parts.push("4. Case studies: reproduce the closest Fundamentals_of_AI_for_PE notebook before adapting.");
+      readingRows.forEach((r) => parts.push(`- Review/repo folder: ${r.folder} (${r.sections})`));
+      algoLinks.slice(0, 8).forEach((l) => parts.push(`- Material: ${l.label} — ${l.href}`));
+    }
+  } else {
+    parts.push("", "Note: I have not reached the final selector report yet — use the selections above only.");
+  }
+
+  parts.push(
+    "",
+    "## Please help me with",
+    "1. (What) Confirm my lifecycle phase, task type, and data modality. Identify any ambiguities or mismatches.",
+    "2. (Which) An end-to-end workflow tailored to my selections (data acquisition → EDA/preprocessing → model choice → validation → deployment for power electronics).",
+    "3. (How) A practical tuning checklist for each recommended algorithm with PE-specific constraints (feature scaling, EDA, physics-informed constraints, statistical comparison).",
+    "4. Which Fundamentals_of_AI_for_PE GitHub Jupyter notebooks and READMEs I should open first, in what order, and why.",
+    "5. Key pitfalls and review-article section references (for example Sec. III-B, Sec. V, Sec. VII-F) most relevant to my path.",
+    "6. A reading sequence: What (Sec. I–II) → Which (Sec. III–VI) → How (Sec. III–VI) → Case studies (Sec. VII).",
+    "7. Clarifying questions only if critical information is still missing.",
+    "",
+    "Respond in structured sections. Ground advice in the review article What–Which–How framework and the GitHub Jupyter Notebook materials."
+  );
+
+  return parts.join("\n");
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand("copy");
+  document.body.removeChild(ta);
+}
+
+function initGenAiButtons() {
+  const copyBtn = document.getElementById("btn-gpt-copy");
+  const openBtn = document.getElementById("btn-gpt-open");
+  const hint = document.getElementById("gpt-promo-hint");
+  const defaultHint =
+    "After completing the wizard, copy a filled prompt with your selections, then open ChatGPT and paste (Ctrl+V).";
+
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const prompt = buildGenAiPrompt(state, lastRec);
+      try {
+        await copyTextToClipboard(prompt);
+        if (hint) {
+          hint.textContent = "Prompt copied — open ChatGPT and paste (Ctrl+V).";
+          window.setTimeout(() => {
+            hint.textContent = defaultHint;
+          }, 5000);
+        }
+      } catch {
+        if (hint) hint.textContent = "Could not copy prompt — try again or copy from browser devtools.";
+      }
+    });
+  }
+
+  if (openBtn) {
+    openBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.open(GENAI_GPT_URL, "_blank", "noopener,noreferrer");
+    });
+  }
+}
+
+/** Keep the assistant widget viewport-fixed (direct child of body). */
+function initFloatingAssistant() {
+  const dock = document.querySelector(".gpt-float");
+  if (!dock) return;
+
+  if (dock.parentElement !== document.body) {
+    document.body.appendChild(dock);
+  }
+
+  Object.assign(dock.style, {
+    position: "fixed",
+    top: "auto",
+    left: "auto",
+    right: "1.25rem",
+    bottom: "1.25rem",
+    zIndex: "1100",
+    width: "min(22rem, calc(100vw - 2rem))",
+    margin: "0",
+    padding: "0",
+    pointerEvents: "none",
+  });
+
+  const inner = dock.querySelector(".gpt-float__inner");
+  if (inner) {
+    inner.style.pointerEvents = "auto";
+  }
+}
+
+initFloatingAssistant();
+initGenAiButtons();
+window.addEventListener("load", initFloatingAssistant);
 
 flow = buildFlow();
 renderStep();

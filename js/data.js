@@ -1,5 +1,5 @@
 /**
- * Content aligned with the TIE tutorial paper and Fundamentals_of_AI_for_PE repo.
+ * Content aligned with the IEEE TIE review article and Fundamentals_of_AI_for_PE repo.
  * Public repo URL (per user): https://github.com/XinzeLee/Fundamentals_of_AI_for_PE
  */
 
@@ -27,80 +27,82 @@ function arch(inputModality, hiddenInvariants, outputLossTask) {
 /** @type {Record<string, string>} */
 export const GLOSSARY = {
   phase:
-    "Lifecycle perspective used in the tutorial: **Design** (modeling & optimization), **Control** (policies & assistive design), **Maintenance** (health, identification, RUL). This mirrors how AI is applied across converter lifecycles.",
+    "Choose where you are in the PE lifecycle: **Design**, **Control**, or **Maintenance**. The review article's **What** dimension organizes AI decisions along this lifecycle, asking what PE problems can be solved by AI at each stage.",
   design_goal:
-    "**Surrogate modeling** learns input→output mappings (efficiency, waveforms, fields). **Optimization** searches design or control parameters using MHAs or RL. **Process automation** couples simulators/tools with scripts or agentic workflows.",
+    "**Surrogate modeling** predicts outputs from inputs (regression or classification). **Optimization** searches better design settings using MHAs or RL. **Process automation** builds data acquisition loops with simulators or agentic AI workflows.",
   io_modality_in:
-    "Choose how **inputs** are encoded: **tabular** columns, **signal** waveforms/spectra, **graph** connectivity, **field** grids, or **hybrid** fusion of several—this drives encoder choice (MLP, RNN, GNN, CNN, multi-branch).",
+    "Choose how your **inputs** are represented. **Tabular:** columns like operating point, component values, and duty settings. **Signal-domain:** time/frequency sequences from probes and analyzers. **Graph:** node-edge connectivity (topology/layout relationships). **Field:** spatial data tied to coordinates (temperature/flux maps or scattered points). **Hybrid:** any combination (for example tabular + waveform + image).",
   io_modality_out:
-    "Choose how **outputs** should be represented: **tabular** metrics/vectors, **signal** trajectories, **graph** structures, **field** maps, or **hybrid**—must match your labels or simulation targets.",
+    "Choose the format of your **target output**. **Tabular:** scalar/vector KPIs (efficiency, ripple, stress). **Signal-domain:** full trajectories/spectra. **Graph:** generated/updated topology or relational structure. **Field:** spatial predictions over coordinates or grids. **Hybrid:** multiple outputs at once (for example a KPI plus a waveform).",
   modality_tabular:
-    "Structured rows/columns: ratings, parameters, efficiency targets. Columns are **rotation-variant**—permutation breaks meaning. Tree models and FNNs are typical; the paper contrasts this with sequences and images.",
+    "Rows/columns such as L, C, duty, and measured KPIs. Keep feature definitions fixed and consistent across datasets; column order and units matter physically.",
   modality_signal:
-    "**Time- or frequency-domain** sequences from scopes, analyzers. Locality, multi-scale structure, and **causality** matter; naive sliding-window tabularization can break temporal dependencies (see tutorial).",
+    "Time/frequency sequences from probes/scopes. Keep sample order, alignment (e.g., switching-edge alignment), and causality; avoid flattening long traces into unrelated columns.",
   modality_graph:
-    "**Nodes/edges**: topologies, PCBs, modules. Captures connectivity and multi-hop effects; graph neural layers are appropriate when relational structure is essential.",
+    "Node-edge data for connectivity (devices, nets, thermal adjacency). Use graph models when relationships between elements drive behavior.",
   modality_field:
-    "**2D/3D multi-physics** samples (flux, temperature). Geometry and PDE structure matter; **gridded** fields suit CNNs; **scattered** probe points with \\((x,y,z)\\) and operating conditions can be learned with **residual FNNs**—see **`field_temperature_residual_fnn.ipynb`** (`4_Neural_Network/Field_Data/`). PINNs add explicit PDE residuals; treating fields as plain images may ignore **boundaries** and **physics**.",
+    "2D/3D fields (temperature, flux, stress). Preserve geometry and boundary conditions; for scattered points, include coordinates plus operating conditions (e.g., loss, ambient).",
   modality_hybrid:
-    "Multiple representations jointly (e.g., tabular + waveform + image). Use **multi-branch** encoders and fusion (concat, gating, attention).",
+    "Mixed data (for example tabular + waveform + thermal image). A practical default is one encoder per modality, then fusion and task-specific output heads.",
   data_abundance:
-    "**Abundant**: enough labeled samples for supervised training. **Scarce**: prioritize **transfer learning**, **semi-supervised** or **generative** augmentation, and **physics-informed** constraints as in the paper—right-size the model to the label budget.",
+    "**Abundant** means enough labeled samples for supervised training across the operating space. **Scarce** means labels are limited — use transfer learning, physics-informed constraints, or semi-supervised methods, and prefer simpler models to avoid overfitting.",
   opt_dimension:
-    "**Low-dimensional** design spaces often suit MHAs (PSO, GA, NSGA-II). **High-dimensional** (>100D) control or policy search is often cast as **RL**—**continuous** actions via **DDPG** / **SAC** (**actor–critic**), **discrete** actions via **DQN** (**Q-networks**). The course repo pairs **DDPG_buck_control.ipynb** (continuous duty) with **RL_buck_control.ipynb** (discrete ΔD) on the same averaged-buck tutorial.",
+    "Few tuning variables usually fit MHAs. Very large action/policy spaces often need RL. Use the buck RL notebooks to compare continuous vs discrete actions.",
   opt_space:
-    "**Continuous** variables suit PSO/DE (vector arithmetic). **Discrete** combinatorial choices align with SA/ACO-style operators. **Hybrid** mixed spaces frequently use **GA**.",
+    "Continuous, discrete, and mixed-variable spaces usually need different optimizers (PSO/DE, SA/ACO, GA).",
   opt_objectives:
-    "**Single-objective** returns one score. **Multi-objective** PE problems (efficiency vs. density vs. cost) use Pareto methods—e.g. NSGA-II/III with non-dominated sorting.",
+    "Single-objective gives one score. Multi-objective gives trade-offs (Pareto front), such as efficiency vs cost vs size.",
   process_auto:
-    "**Simulation automation** batches netlists/schematics (LTspice, PLECS, MATLAB APIs). **Agentic AI** uses LLM reasoning, RAG memory, and tool calls (e.g. PE-GPT paradigm).",
+    "Simulation automation runs many cases and saves clean datasets. Agentic AI adds an LLM loop that plans, calls tools, and keeps context.",
   control_role:
-    "**AI as controller** embeds learned policies (RL or imitation NN). **Assist control design** builds surrogates or tunes gains—maps back to modeling or optimization branches.",
+    "**AI as controller** means model outputs control actions online. **Assist control design** means AI helps tuning or modeling, not direct final control.",
   policy_type:
-    "**RL** learns from environment interaction and rewards (MDP): e.g. **DQN** for **discrete** actions, **DDPG/SAC** for **continuous** control—**RL_buck_control.ipynb** vs. **DDPG_buck_control.ipynb** illustrate both on the same averaged buck. **Imitation** learns to mimic an existing controller or surrogate—often an NN trained offline then optionally deployed.",
+    "**RL** learns by trial and reward. **Imitation** learns from an existing controller or expert data.",
   deployment:
-    "**Online** runs on hardware/MCU/FPGA with latency and memory limits—consider **TinyML**: quantization, pruning, shallow-wide nets, ONNX Runtime/TFLite as in the tutorial case study.",
+    "**Online** means real-time hardware constraints (latency, memory, precision). TinyML focuses on keeping models fast and small on edge targets.",
   maint_fdd:
-    "**Fault detection & diagnosis** maps measurements to health states. Supervision level (labels), task type (binary, multi-class, multi-label), and modality drive algorithm choice.",
+    "FDD maps measurements to health/fault states. Your label availability and data modality should drive model choice.",
   fdd_modality:
-    "Pick how measurements are represented: **tabular** features per cycle, **signal** waveforms/spectra, **graph** circuit/topology features, or **unstructured** images/text—this determines classic ML vs. sequence models vs. GNN vs. CNN.",
+    "Choose tabular, signal, graph, or unstructured inputs based on sensors and data collection. Then match the model family to that modality.",
   maint_sid:
-    "**System identification** estimates parameters (L, R, etc.). Formulated like surrogate learning with physics consistency; inverse PINNs/PANNs appear in the paper’s examples.",
+    "System identification estimates physical parameters (for example L, R, loss terms) from measured behavior.",
   maint_rul:
-    "**Remaining useful life** often uses temporal models with **uncertainty** (Gaussian or mixture heads) when data are sparse—uncertainty grows in under-sampled regimes per the tutorial.",
+    "RUL predicts remaining life. Use uncertainty-aware outputs when data are sparse or operating conditions shift.",
   piml:
-    "**Physics-informed ML** embeds governing equations or constraints via losses, architectures (PINN, PANN), or hybrid data—reduces data needs and improves trustworthiness.",
+    "**Physics-informed ML (PIML)** injects known PE equations and constraints into the learning process. The review article groups PIML into three categories: **physics-in-initialization** (parameter initialization), **physics-in-loss (PINNs)** (PDE residual penalty terms), and **physics-in-architecture (PANNs)** (hard-coding PDEs into the model structure). PIML is especially beneficial when labeled data are limited.",
   mha_tuning:
-    "Balance **exploration vs. exploitation** (e.g. PSO inertia schedules); customize when landscape is multi-modal (niching) or steep (gradient hints). Compare runs with **statistical tests** (t-test / ANOVA).",
+    "Tune the balance between **global exploration** and **local exploitation** (e.g., decreasing PSO inertia weight). Run multiple seeds and compare methods statistically (t-test for two algorithms, ANOVA for three or more) before concluding one is better. Report p-values and which mean is better.",
   nn_practice:
-    "Feature **scaling**, train/val/test splits (including **per-dataset / per-CSV** splits when each file is an operating case), BatchNorm/LayerNorm placement, **residual** skip paths, early stopping (**best weights** in memory or on disk per notebook), regularization (L1/L2), and architecture ablation—see **`good_practice_NN.ipynb`**, **`field_temperature_residual_fnn.ipynb`** (3-D **T** field from scattered samples), and related course notebooks.",
+    "Start with **feature scaling** (critical for PE data spanning orders of magnitude), clean train/val/test splits, early stopping, and a simple baseline. Add regularization, BatchNorm/LayerNorm, and architecture changes only when validation data supports it. Refer to **good_practice_NN.ipynb** for a systematic checklist.",
 };
 
 const PAPER = {
   mha_explore:
-    "The tutorial emphasizes early **global exploration** then **local exploitation** (e.g. decreasing PSO inertia); landscape-aware niching for multi-modal objectives.",
+    "**Sec. V:** Tune MHA hyperparameters to balance **global exploration** and **local exploitation**. A common strategy is to emphasize exploration early (e.g., high PSO inertia weight) then shift toward exploitation (linearly decreasing inertia). For multi-modal objectives, **niching** strategies with clustering-penalty mechanisms help track multiple global optima.",
   mha_stats:
-    "Use **t-tests** for two algorithms or **ANOVA** for multiple; report p-values and which mean is better.",
+    "**Sec. V:** Because MHAs are stochastic, always run **multiple seeds** and compare methods statistically: use **t-tests** for two algorithms or **ANOVA** for three or more. Report p-values and which mean is better — a single best run is not sufficient evidence.",
   nn_scaling:
-    "PE features can differ by orders of magnitude—**standardization/normalization** avoids one feature dominating gradients (DAB example in the paper).",
+    "**Sec. III-B–III-F:** PE features can differ by orders of magnitude (e.g., voltages in hundreds of volts vs. switching frequencies in kHz)—**standardization/normalization** is essential to prevent one feature from dominating gradients. The DAB EDA example in the review article illustrates this.",
+  nn_practice:
+    "**Sec. III-F:** Apply feature scaling, clean train/val/test splits, BatchNorm/LayerNorm, residual paths, early stopping, and architecture ablation systematically. See **`good_practice_NN.ipynb`** for a step-by-step checklist.",
   tinyml:
-    "Case study: prefer **shallow-wide** over **deep-narrow** NNs at similar parameter counts for latency; **ONNX Runtime** gave ~5× speedup; quantization/pruning for MCUs.",
+    "**Sec. VII-D (Dataset D3):** For edge deployment, prefer **shallow-wide** over **deep-narrow** NNs at similar parameter counts to minimize inference latency. **ONNX Runtime** gave approximately 5× speedup in the DAB adaptive modulation case study; quantization (FP32 to INT8) and pruning further reduce cost for MCU deployment.",
   signal_window:
-    "Sliding-window **tabularization** of waveforms is common but can break causality and long-range dependencies—prefer recurrent or 1D CNN architectures when sequences matter.",
+    "**Sec. II-B; III-F:** Sliding-window **tabularization** of waveforms is common but can break causality and long-range temporal dependencies. Prefer recurrent (LSTM/GRU) or 1D CNN architectures when sequence structure and ordering carry physical meaning.",
   piml_loss:
-    "Use **weighted composite** objectives—e.g. **λ_pde·‖residual‖²** + **λ_ic·‖IC‖²** + **λ_bc·‖BC‖²** (+ optional **supervised data** term)—on **fixed** collocation / IC / BC point sets; tune scalars so no single term dominates. Course **pinn_ode.ipynb** (ODE) and **pinn_pde.ipynb** (Burgers PDE) follow this recipe with Adam + gradient clipping + optional L-BFGS; PINNs can complement FEM for multi-physics.",
+    "**Sec. IV-A–IV-C:** Use **weighted composite** loss objectives—e.g. \\(\\lambda_{\\mathrm{pde}} \\|\\mathrm{residual}\\|^2 + \\lambda_{\\mathrm{ic}} \\|\\mathrm{IC}\\|^2 + \\lambda_{\\mathrm{bc}} \\|\\mathrm{BC}\\|^2\\) (+ optional **supervised data** term)—on **fixed** collocation / IC / BC point sets; tune scalars so no single term dominates. GitHub **pinn_ode.ipynb** (ODE) and **pinn_pde.ipynb** (Burgers PDE) follow this recipe with Adam + gradient clipping + optional L-BFGS. PINNs can complement FEM for multi-physics scenarios.",
   eda:
-    "**EDA:** histograms (spread, skew, modality), correlation maps (redundant features, latent equality constraints), **t-SNE** for manifold / transfer scenarios; from-to-viz catalog for plot choice.",
+    "**Sec. III-B:** Conduct EDA before committing to a model family. Use **histograms** to reveal spread, skewness, and modality; **correlation maps** to identify redundant features and latent equality constraints; **t-SNE** to visualize manifolds and identify operating regimes, interpolation gaps, and transfer learning opportunities.",
   transfer:
-    "**Transfer learning:** reuse source-domain clusters; if target lies between clusters (interpolation gap), accuracy may suffer—partition data or fine-tune (DAB t-SNE example).",
+    "**Sec. III-B; VII-B:** **Transfer learning** reuses source-domain knowledge. If the target domain lies in a sparse region between source clusters (interpolation gap), accuracy may suffer. Partition data or fine-tune on target-domain samples. The DAB t-SNE example in the review article illustrates this.",
   moo_pe:
-    "**Multi-objective PE:** decomposition (weighted subproblems—normalize scales) vs. population Pareto methods (**NSGA-II/III**, non-dominated sorting). NSA exact on small discrete spaces; curse of dimensionality on continuous grids.",
+    "**Sec. V:** For **multi-objective PE optimization**, use decomposition (weighted subproblems — normalize objective scales) or population-based Pareto methods (**NSGA-II/III**, non-dominated sorting). NSGA is exact on small discrete spaces; the curse of dimensionality applies on large continuous grids.",
   graph_invariants:
-    "Graphs encode **topological connectivity**, **locality**, **multi-hop dependency**—suited to layouts, topologies, PCBs vs. naive categorical encoding.",
+    "**Sec. II-D; III-E:** Graph data encode **topological connectivity** (node linkages and information flow), **locality** (localized effects within a neighborhood), and **multi-hop dependency** (influence propagating through successive connections). Graph-based models are suited to PE layouts, topologies, and PCBs where treating layout as a single categorical variable discards relational structure.",
   fdd_multilabel:
-    "**Multi-label** allows co-occurring faults (e.g. wire-bond liftoff + thermal runaway); use sigmoid + BCE per class, not softmax exclusivity.",
+    "**Sec. III-B:** When multiple faults can co-occur simultaneously (e.g., wire-bond liftoff + thermal runaway), use **multi-label** classification with **sigmoid + BCE** per class rather than a single **softmax** head, which enforces mutual exclusivity.",
   agentic_stack:
-    "**Agentic AI:** LLM + episodic/semantic/procedural **memory** (RAG), **tools** (simulation, parsing), **planning** (CoT, ReAct, plan-and-execute); PE-GPT exemplar.",
+    "**Sec. VI:** **Agentic AI** combines four core elements: **LLMs** (for intent interpretation and synthesis), **memory** (episodic, semantic, and procedural, often retrieved via RAG), **tools** (interfaces for simulation, parsing, and computation), and **reasoning and planning** modules (chain-of-thought, ReAct, plan-and-execute). The PE-GPT exemplar demonstrates this paradigm for power electronics design automation.",
 };
 
 /** From algorithm_paths_extracted.txt — modality pairing + scarce branch */
@@ -120,7 +122,7 @@ export const PATH_ENUM_PAIRS = {
       "**Paths 3–4:** Use **FNN** on inputs, then **recurrent**, **1D CNN**, or **causal Transformer** blocks on outputs. *Enumeration:* sequence generator—tabular in, **waveform/spectrum out**.",
     scarce: "Same as Path 3; add **TL**, **physics priors**, or **targeted augmentation** on the sequence side.",
     workflow: "Encode static design/context with MLP; decode time or frequency with sequence layers respecting **causality** (masks for conv/attention if predicting future samples).",
-    pitfalls: "Do not flatten long outputs into independent tabular slots—breaks temporal structure emphasized in the tutorial.",
+    pitfalls: "Do not flatten long outputs into independent tabular slots—breaks temporal structure emphasized in the review article.",
   },
   tabular_graph: {
     abundant:
@@ -134,7 +136,7 @@ export const PATH_ENUM_PAIRS = {
       "**Paths 7–8:** FNN → **CNN** field head, **PINN** with coupled physics, or **FNN-on-flattened** field. *Enumeration:* field modeling from parameters—efficiency, loss density maps.",
     scarce: "PINN with physics residuals; blend sparse experiments with **physics-informed** regularization under small label sets.",
     workflow:
-      "Parameter vector → decoder grid; PINN: **fixed** collocation (and IC/BC points); **soft** IC/BC via MSE penalties; **weighted composite** loss vs. pure `data + α·physics` (see **pinn_pde.ipynb** / **pinn_ode.ipynb**). **Scattered field samples:** **`field_temperature_residual_fnn.ipynb`** maps **(x,y,z, loss, Tamb) → T** with a **residual FNN** and **train/val/test by CSV file**.",
+      "Parameter vector → decoder grid; PINN: **fixed** collocation (and IC/BC points); **soft** IC/BC via MSE penalties; **weighted composite** loss vs. pure `data + α·physics` (see **pinn_pde.ipynb** / **pinn_ode.ipynb**). **Scattered field samples:** **`field_temperature_residual_fnn.ipynb`** maps \\((x,y,z,\\text{loss},\\mathrm{Tamb}) \\rightarrow T\\) with a **residual FNN** and **train/val/test by CSV file**.",
     pitfalls: "Pure image-CNN on fields may ignore **geometry and multi-physics coupling**—open research vs. PINN/geometry-aware operators.",
   },
   tabular_hybrid: {
@@ -147,7 +149,7 @@ export const PATH_ENUM_PAIRS = {
   signal_tabular: {
     abundant:
       "**Paths 11–12:** **RNN/LSTM/GRU/BiLSTM**, **1D CNN**, **attention**, state-space (**Mamba**); output **FNN**. *Enumeration:* **locality + causality**; **BiLSTM** only if backward context is **physically allowed** (no leakage); 1D CNN needs **dilation/stacking** for long range; **causal masks** for conv/attention when predicting hidden future samples.",
-    scarce: "Same encoders + TL/PIML; align waveforms to switching edges to reduce phase ambiguity (tutorial DAB time-series).",
+    scarce: "Same encoders + TL/PIML; align waveforms to switching edges to reduce phase ambiguity (review article DAB time-series).",
     workflow: "Sequence encoder → pooling → scalar/vector head; EDA on waveforms before windowing.",
     pitfalls: "**Sliding-window + tabular ML** alone can break long-range dependencies and causality—paper Dataset III vs. recurrent models.",
   },
@@ -287,26 +289,51 @@ export const PATH_ENUM_PAIRS = {
   },
 };
 
-/** Shown on modeling / maintenance flows — tutorial §IV, tightened */
+/** Shown on modeling / maintenance flows — review article §III, tightened */
 export const TUTORIAL_ML_PIPELINE = `
-<p><strong>Workflow (top-down):</strong> acquire data → <strong>EDA & preprocess</strong> (histograms, correlations, scaling, outliers, t-SNE when structure matters) → train → tune → deploy. Treat steps 2–4 as a <em>loop</em>: bad errors usually mean bad data or leakage.</p>
-<p><strong>Framing:</strong> <em>When</em> is learning justified? <em>What</em> modality and model class fit? <em>How</em> will you validate (hold-outs; for stochastic search, statistical tests across runs)?</p>
+<p><strong>Generic ML workflow (Sec. III-A):</strong> (1) <strong>Data acquisition</strong> (simulation batches or lab measurements) → (2) <strong>EDA & preprocessing</strong> (histograms, correlation maps, t-SNE, feature scaling, outlier removal) → (3) <strong>Model training</strong> → (4) <strong>Hyperparameter tuning</strong> → (5) <strong>Deployment and execution</strong>. Steps 2–4 form an <em>iterative loop</em>: misclassified or incorrect predictions often indicate data outliers or preprocessing issues — return to EDA.</p>
+<p><strong>What–Which–How framing:</strong> <em>What</em> PE problem are you solving (lifecycle phase, task, data modality)? <em>Which</em> AI model class fits (classic ML, NN, PIML, MHA, RL, agentic)? <em>How</em> will you tune and validate (hold-outs, operating-range-aware splits, statistical tests for stochastic methods)?</p>
 `;
 
 /** Optimization paths 51–59 — concise */
 export const OPTIMIZATION_REVIEW_HTML = `
 <ul class="report-list">
-  <li><strong>51–53 (high-D RL):</strong> match action space (continuous vs discrete vs hybrid); reward design, sim-to-real, and safety matter more than algorithm labels—compare seeds and report spread. The course repo includes <strong>pedagogical buck</strong> notebooks: <code>DDPG_buck_control.ipynb</code> (<strong>continuous</strong> duty) and <code>RL_buck_control.ipynb</code> (<strong>discrete</strong> ΔD) on the same averaged model—production work often still relies on libraries such as Stable-Baselines3.</li>
-  <li><strong>54–59 (low-D MHA):</strong> PSO/DE on continuous vectors; GA/SA/ACO on discrete/hybrid; NSGA-II/III for Pareto fronts—<strong>normalize objectives</strong> before weighted sums or crowding.</li>
+  <li><strong>Paths 51–53 (high-D RL):</strong> Match action space to algorithm: continuous → DDPG/SAC, discrete → DQN, hybrid → parameterized action spaces. Reward design, sim-to-real fidelity, and safety constraints typically matter more than the specific RL algorithm choice. Compare multiple seeds and report spread. The GitHub repo includes pedagogical buck notebooks: <code>DDPG_buck_control.ipynb</code> (continuous duty) and <code>RL_buck_control.ipynb</code> (discrete ΔD) on the same averaged buck model.</li>
+  <li><strong>Paths 54–59 (low-D MHA):</strong> Use PSO/DE for continuous search vectors; SA/ACO for discrete moves; GA for hybrid mixed-variable problems; NSGA-II/III for Pareto fronts. <strong>Normalize objectives</strong> before applying weighted sums or crowding distance. Run multiple seeds and apply statistical tests (t-test for two algorithms, ANOVA for three or more) before declaring one algorithm superior.</li>
 </ul>`;
 
 /** Maintenance — FDD/RUL cross-checks */
 export const MAINTENANCE_REVIEW_HTML = `
 <ul class="report-list">
-  <li><strong>EDA:</strong> same as modeling—correlation for redundancy, t-SNE for regimes and transfer gaps.</li>
-  <li><strong>Multi-label faults:</strong> sigmoid + BCE per class (not softmax) when faults co-occur.</li>
+  <li><strong>EDA first:</strong> Apply the same EDA workflow as modeling — correlation maps for redundancy, histograms for class imbalance, and t-SNE for operating regimes and transfer gaps. Identify whether fault signatures are separable before choosing a model.</li>
+  <li><strong>Multi-label faults:</strong> When multiple faults can co-occur, use <strong>sigmoid + BCE per class</strong> (not softmax) to allow simultaneous fault predictions. Calibrate per-label thresholds against false-alarm cost.</li>
+  <li><strong>Semi-supervised option:</strong> When fault labels are scarce but normal operation data are abundant, consider semi-supervised pipelines (consistency regularization, pseudo-labeling) before collecting more labeled fault data.</li>
 </ul>`;
 
+/**
+ * NOTEBOOK_PATH_MAP — maintainer reference: wizard branch → primary `.ipynb` set
+ * (canonical inventory: 31 notebooks under Fundamentals_of_AI_for_PE; README-only paths noted)
+ *
+ * | Branch | Primary notebooks |
+ * |--------|-------------------|
+ * | Modeling tabular→tabular | buckXgb, buckNn, classic, ridgePoly, ensemble, dabOne |
+ * | Modeling tabular→signal | rnn, dabTs |
+ * | Modeling tabular→graph | (none — Graph_NN/README.md only) |
+ * | Modeling tabular→field | pinnOde, pinnPde, pinn1, magnetFnn, fieldResidualFnn |
+ * | Modeling tabular→hybrid | dabOne, buckFull |
+ * | Modeling signal→* | rnn, dabTs (+ pannReadme for PANN) |
+ * | Optimization low-D MHA | buckPso, singMha, psoTune, algoStats, buckFull, moo |
+ * | Optimization high-D RL | rlBuckDdpg, rlBuck (+ rl README) |
+ * | Control RL | rlBuckDdpg, rlBuck |
+ * | Control imitation / TinyML | nnBasics, nnGood, tinyml, dabOne |
+ * | Process sim | ltspice, plecs |
+ * | Process agentic | (README only — agentic) |
+ * | FDD tabular (supervised) | classic, ensemble, ridgePoly |
+ * | FDD signal | rnn, dabOne, dabTs |
+ * | FDD graph | (Graph_NN/README.md only) |
+ * | RUL | rul, rnn, mdn |
+ * | Case studies D1–D7 | buck* (D1), dabOne (D2), tinyml (D3), dabTs (D4), rul (D5), magnet* (D6), fieldResidualFnn (D7) |
+ */
 const NB = {
   package: "0_To_Get_Started/package_install.ipynb",
   singMha: "1_MHA/Single_Objective_MHA/sing_obj_MHA.ipynb",
@@ -327,14 +354,13 @@ const NB = {
   pinnOde: "5_PIML/PINN/pinn_ode.ipynb",
   pinnPde: "5_PIML/PINN/pinn_pde.ipynb",
   pinn1: "5_PIML/PINN/prior_integration_example.ipynb",
-  pinn2: "5_PIML/PINN/prior_integration_example2.ipynb",
   pimlReadme: "5_PIML/README.md",
+  ridgePoly: "2_Classic_ML/ridge_polynomial_regression.ipynb",
   pannReadme: "5_PIML/PANN/README.md",
   agentic: "6_Agentic_AI/README.md",
   rl: "7_Reinforcement_Learning/README.md",
   rlBuck: "7_Reinforcement_Learning/RL_buck_control.ipynb",
   rlBuckDdpg: "7_Reinforcement_Learning/DDPG_buck_control.ipynb",
-  attentionFdd: "9_Case_Studies_PE/PV_Plant_FDD/attention_fdd.ipynb",
   ltspice: "8_PE_Simulation_Automation/LTspiceAutomation/LTspiceAtuomate.ipynb",
   plecs: "8_PE_Simulation_Automation/PlecsAutomation/Data acquisition.ipynb",
   simReadme: "8_PE_Simulation_Automation/README.md",
@@ -348,14 +374,27 @@ const NB = {
   magnetLstm: "9_Case_Studies_PE/Magnetic_Modeling/magnet_lstm.ipynb",
   rul: "9_Case_Studies_PE/IGBT_Maintenance/rul_prediction.ipynb",
   caseReadme: "9_Case_Studies_PE/README.md",
+  buckReadme: "9_Case_Studies_PE/Buck_Design/README.md",
+  dabReadme: "9_Case_Studies_PE/DAB_Design/README.md",
+  dabPerfReadme: "9_Case_Studies_PE/DAB_Design/Performance_Modeling_and_Design/README.md",
+  dabTsReadme: "9_Case_Studies_PE/DAB_Design/Time_Domain_Modeling/README.md",
+  dabAdaptiveReadme: "9_Case_Studies_PE/DAB_Design/Adaptive_Modulation/README.md",
+  igbtReadme: "9_Case_Studies_PE/IGBT_Maintenance/README.md",
+  magnetReadme: "9_Case_Studies_PE/Magnetic_Modeling/README.md",
   graphNN: "4_Neural_Network/Graph_NN/README.md",
 };
 
 function repoLinks(paths, labels) {
-  return paths.map((p, i) => ({
+  const items = paths.map((p, i) => ({
     label: labels?.[i] || p.split("/").pop(),
     href: ghBlob(p),
+    path: p,
   }));
+  items.sort((a, b) => {
+    const rank = (p) => (p.endsWith(".ipynb") ? 0 : 1);
+    return rank(a.path) - rank(b.path);
+  });
+  return items.map(({ label, href }) => ({ label, href }));
 }
 
 /** @param {number} inIdx 0..4 */
@@ -365,6 +404,15 @@ export function modelingPathId(inIdx, outIdx, scarce) {
 }
 
 const MOD_LABELS = ["Tabular", "Signal-domain", "Graph", "Field", "Hybrid"];
+
+function buildModelingPathExcerpt(inKey, outKey, scarce) {
+  const inLabel = inKey === "signal" ? "signal-domain" : inKey;
+  const outLabel = outKey === "signal" ? "signal-domain" : outKey;
+  const scarcity = scarce
+    ? "With scarce labels, the review article recommends transfer learning, semi-supervised options, or physics-based constraints before scaling model size."
+    : "With adequate labels, start from strong baselines and add complexity only when validation gains are clear.";
+  return `Sec. II and Sec. III explain this ${inLabel}→${outLabel} path: first match model family to data structure, then run EDA and validation before tuning. ${scarcity}`;
+}
 
 /**
  * @returns {{ pathId: number, title: string, summary: string, algorithms: object[], flags: object, extras: object, scarceHtml?: string, tutorialPipelineHtml?: string, pathEnumAbundant?: string, pathEnumScarce?: string, pathWorkflow?: string, pathPitfalls?: string, reviewContextHtml?: string }}
@@ -398,20 +446,21 @@ export function buildModelingRecommendation(inKey, outKey, scarce) {
     return {
       pathId,
       title: `Modeling — ${tin} → ${tout}${scarce ? " (scarce)" : " (abundant)"}`,
-      summary: "See tutorial for modality pairing.",
+      summary: "See review article for modality pairing.",
       algorithms: [],
       flags: { nn: true, mha: false, tinyml: false, piml: false },
       extras: { nn: true, mha: false, tinyml: false, piml: false },
       scarceHtml: scarceNote,
       tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
       reviewContextHtml: scarce ? `<p class="paper-note">${PAPER.transfer}</p>` : "",
+      pathReviewExcerpt: buildModelingPathExcerpt(inKey, outKey, scarce),
       ...pathExtra,
     };
   }
 
   return {
     pathId,
-    title: `Path ${pathId}: ${tin} → ${tout}${scarce ? " — scarce data" : " — abundant data"}`,
+    title: `${tin} → ${tout}${scarce ? " — scarce data" : " — abundant data"}`,
     summary: base.summary,
     algorithms: base.algorithms,
     flags: base.flags,
@@ -420,6 +469,7 @@ export function buildModelingRecommendation(inKey, outKey, scarce) {
     tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
     /* EDA lives in TUTORIAL_ML_PIPELINE; only add transfer when scarce */
     reviewContextHtml: scarce ? `<p class="paper-note">${PAPER.transfer}</p>` : "",
+    pathReviewExcerpt: buildModelingPathExcerpt(inKey, outKey, scarce),
     ...pathExtra,
   };
 }
@@ -428,7 +478,7 @@ export function buildModelingRecommendation(inKey, outKey, scarce) {
 const MODEL_PAIRS = {
   tabular_tabular: {
     summary:
-      "Surrogate mapping from design/operating features to performance metrics. Tree ensembles align with **rotation-variant** tabular structure; FNNs yield smoother surrogates (tutorial buck/DAB examples).",
+      "Surrogate mapping from design/operating features to performance metrics. Tree ensembles align with **rotation-variant** tabular structure; FNNs yield smoother surrogates (review article buck/DAB examples).",
     flags: { nn: true, mha: false, tinyml: false, piml: false },
     extras: { nn: true, mha: false, tinyml: false, piml: true },
     algorithms: [
@@ -446,11 +496,11 @@ const MODEL_PAIRS = {
         tricks:
           "Plot **feature importance** and **SHAP**-style attributions to catch spurious columns; in **sparse** regions prefer **targeted augmentation** or smooth MLPs over deep trees.",
         caseStudy:
-          "**Buck** efficiency/ripple modeling and **DAB** current stress / ZVS classification in the tutorial case studies.",
-        paper: PAPER.nn_scaling,
+          "**Dataset D1 (buck):** efficiency/ripple in **`xgboost_buck_modeling.ipynb`**; **Dataset D2 (DAB performance):** current stress / ZVS in **`one_stop_AI_DAB_modulation.ipynb`** (Sec. VII-B–C).",
+        paper: "**Sec. III-B–III-E; VII-A–C** — tree ensembles on rotation-variant tabular PE data.",
         links: repoLinks(
-          [NB.buckXgb, NB.ensemble, NB.dabOne],
-          ["xgboost_buck_modeling.ipynb", "ensemle_learning.ipynb", "one_stop_AI_DAB_modulation.ipynb"]
+          [NB.buckXgb, NB.classic, NB.ridgePoly, NB.ensemble, NB.dabOne, NB.buckReadme],
+          ["xgboost_buck_modeling.ipynb", "classic_ML.ipynb", "ridge_polynomial_regression.ipynb", "ensemle_learning.ipynb", "one_stop_AI_DAB_modulation.ipynb", "Buck_Design/README.md"]
         ),
         external: [
           { label: "Why tree models excel on tabular data (Grinsztajn et al., arXiv) — cited in paper", href: "https://arxiv.org/abs/2111.01889" },
@@ -459,10 +509,10 @@ const MODEL_PAIRS = {
       {
         name: "Feedforward neural networks (MLP)",
         intro:
-          "Universal approximators for **tabular → tabular** surrogates: each column is a physically meaningful coordinate, so the **input** is the full feature row after **scaling/normalization**. The tutorial contrasts **piecewise tree** surfaces with **smoother** MLP landscapes—often **Tanh** or SiLU—for interpolation between simulation or lab points.",
+          "Universal approximators for **tabular → tabular** surrogates: each column is a physically meaningful coordinate, so the **input** is the full feature row after **scaling/normalization**. The review article contrasts **piecewise tree** surfaces with **smoother** MLP landscapes—often **Tanh** or SiLU—for interpolation between simulation or lab points.",
         architecture: arch(
           "The **input layer** is one **vector** per sample: length = number of **tabular** fields after **scaling/normalization**, plus **one-hot** or **small embeddings** for categoricals. This is exactly how **tabular modality** is interfaced—each component maps to a **named physical variable** (rating, duty, loss, etc.); **permuting columns would corrupt meaning**, so the net sees a **fixed-order** design vector, matching the paper’s **rotation-variance** point.",
-          "**Hidden** layers are **fully connected** stacks (**2–4** blocks, widths often **32–512**) with **Tanh/SiLU**. That stack **encodes** an invariant of **smooth, composable nonlinear maps** over the operating envelope (unlike **axis-aligned tree** splits). **LayerNorm** and **residual** FC paths help when features span **orders of magnitude** after scaling—aligning with the tutorial’s emphasis on **feature scaling** before NNs.",
+          "**Hidden** layers are **fully connected** stacks (**2–4** blocks, widths often **32–512**) with **Tanh/SiLU**. That stack **encodes** an invariant of **smooth, composable nonlinear maps** over the operating envelope (unlike **axis-aligned tree** splits). **LayerNorm** and **residual** FC paths help when features span **orders of magnitude** after scaling—aligning with the review article’s emphasis on **feature scaling** before NNs.",
           "The **output layer** is **affine**: **one unit per continuous KPI** for **regression** or **C logits** for **C-way classification** (**softmax**). **Loss** is **MSE/Huber** when targets are real-valued efficiencies/stresses (**supervised regression**), or **cross-entropy** when targets are discrete labels (**supervised classification**)—each loss directly scores mismatch against **labeled outputs** for the task. **Weight decay** and **early stopping** regularize optimization but are not part of the forward I/O contract."
         ),
         tuning:
@@ -470,8 +520,8 @@ const MODEL_PAIRS = {
         tricks:
           "**Residual** connections and **LayerNorm** stabilize deeper MLPs on heterogeneous scales; compare against **Tabular Transformer** when column interactions are subtle.",
         caseStudy:
-          "DAB and buck NN surrogates vs. XGBoost in tutorial §VII.; **3-D thermal samples** in **`field_temperature_residual_fnn.ipynb`** (per-CSV splits, residual FNN).",
-        paper: PAPER.nn_scaling,
+          "**Dataset D1:** **`buck_modeling_NN.ipynb`**; **Dataset D2:** DAB surrogates; **Dataset D7:** scattered thermal probes in **`field_temperature_residual_fnn.ipynb`** (Sec. VII-G).",
+        paper: "**Sec. III-F; VII-A–G** — MLP surrogates vs. tree baselines; feature scaling emphasized in DAB EDA.",
         links: repoLinks(
           [NB.buckNn, NB.nnBasics, NB.dabOne, NB.fieldResidualFnn],
           ["buck_modeling_NN.ipynb", "NN_basics.ipynb", "one_stop_AI_DAB_modulation.ipynb", "field_temperature_residual_fnn.ipynb (T-field CSVs)"]
@@ -519,7 +569,7 @@ const MODEL_PAIRS = {
         tuning: "Sequence length, hidden size, mask causal conv/attention for forecasting tasks.",
         tricks:
           "If outputs are **spectra**, treat frequency bins as sequence or use **1D CNN** with appropriate padding; align phase with a **reference edge** (switching instant) when waveforms are misaligned.",
-        caseStudy: "Tutorial warns against **sliding-window-only** pipelines for long dependencies.",
+        caseStudy: "Review article warns against **sliding-window-only** pipelines for long dependencies.",
         paper: PAPER.signal_window,
         links: repoLinks([NB.rnn, NB.dabTs]),
         external: [{ label: "Attention Is All You Need (Vaswani et al.)", href: "https://arxiv.org/abs/1706.03762" }],
@@ -538,15 +588,15 @@ const MODEL_PAIRS = {
           "Generate or refine **graphs** (nodes/edges = devices, nets, layout) **conditioned** on tabular design specs. The paper stresses **connectivity** and **multi-hop** effects for layouts and EMI—decoders are often **autoregressive** (add edge/node) or **one-shot** matrix heads with validity constraints.",
         architecture: arch(
           "**Input layer** fuses **tabular modality** (global specs as a vector, sometimes **broadcast** onto nodes or concatenated to each node state) with **graph modality**: **node features** (device types, ratings, pins) and **edge features** (net class, parasitic tags) plus **topology** (**adjacency**). The interface is **relational**: the same net sees **who connects to whom**, not a single categorical **layout ID**.",
-          "**Hidden** layers are **message-passing** (**GCN**, **GraphSAGE**, **GAT**): each step **aggregates neighbors**, revealing invariants of **connectivity**, **local neighborhoods**, and **multi-hop influence**—the tutorial’s graph invariants. Depth trades **receptive field** vs. **over-smoothing**; **attention** (GAT) weights which edges matter for EMI or stress paths.",
+          "**Hidden** layers are **message-passing** (**GCN**, **GraphSAGE**, **GAT**): each step **aggregates neighbors**, revealing invariants of **connectivity**, **local neighborhoods**, and **multi-hop influence**—the review article’s graph invariants. Depth trades **receptive field** vs. **over-smoothing**; **attention** (GAT) weights which edges matter for EMI or stress paths.",
           "**Outputs** are **logits** over **edges/nodes** (**BCE/CE**) for **discrete** structure, or **linear** heads for **continuous** attributes. **Loss** matches the **generative or refinement task**: e.g. **cross-entropy** on supervised topology, **MSE** on continuous attributes, plus optional **soft penalties** for **Kirchhoff** or **design rules**—linking optimization to **feasible** PE graphs."
         ),
         tuning: "Layers, heads (GAT), neighbor sampling for large graphs.",
         tricks:
           "Validate generated graphs with **design rules** (netlists, clearance) before trusting optimizers; combine **graph VAE / autoregressive** decoders with constraint penalties.",
-        caseStudy: "Paper cites graph-based layout/EMI motivation; PE-GPT can orchestrate tools.",
-        paper: "See graph data subsection and **Circuit-to-Graph** reference in the tutorial.",
-        links: repoLinks([NB.graphNN, NB.agentic], ["Graph_NN/README.md", "6_Agentic_AI/README.md (workflow context)"]),
+        caseStudy: "Paper cites graph-based layout/EMI motivation (Sec. II-D); **no local GNN training `.ipynb`**—start from **Graph_NN/README.md** and external PyG/DGL stacks.",
+        paper: "**Sec. II-D; III-E** — graph invariants and Circuit-to-Graph references.",
+        links: repoLinks([NB.graphNN], ["Graph_NN/README.md (no GNN training notebook in repo)"]),
         external: [
           { label: "PyTorch Geometric", href: "https://pytorch-geometric.readthedocs.io/" },
           { label: "IEEE Access — GNN opportunities in PE (Li et al.)", href: "https://ieeexplore.ieee.org/document/10273109" },
@@ -567,14 +617,14 @@ const MODEL_PAIRS = {
         architecture: arch(
           "**Input layer** concatenates **field modality** support—**coordinates** **(x,y,z,t)** (often **normalized**)—with optional **tabular/design parameters** (material, geometry knobs) so the same network can **condition** the field on the converter instance. **Collocation points** are additional **inputs** used only in the **PDE term**, not as supervised labels.",
           "**Hidden** trunk is an **MLP** (or **conv** on structured grids) that approximates **u(x,…)**. Its role is to be **flexible** enough to fit data while **PDE residuals** in the loss **impose invariants** of **governing equations** and **boundaries**—the **physics-informed** invariant rather than pure **translation equivariance** of a blind CNN.",
-          "**Output** is field value(s) **u** (or **multi-channel** fields); **inverse PINNs** also expose **positive trainable scalars** (e.g. **k** via **exp(log k)** in **pinn_ode.ipynb**) that enter the **residual**. **Loss** is typically a **weighted sum**: **MSE** on **supervised** points + **λ_pde·‖residual‖²** + **λ_ic·‖IC‖²** + **λ_bc·‖BC‖²** (+ optional sparse **data** term), often on **fixed** collocation/IC/BC grids with **Adam** + **gradient clipping** + **ReduceLROnPlateau** and optional **L-BFGS** polish—the learning task is **regression under PDE/ODE constraints**, not classification."
+          "**Output** is field value(s) **u** (or **multi-channel** fields); **inverse PINNs** also expose **positive trainable scalars** (e.g. **k** via **exp(log k)** in **pinn_ode.ipynb**) that enter the **residual**. **Loss** is typically a **weighted sum**: **MSE** on **supervised** points + \\(\\lambda_{\\mathrm{pde}} \\|\\mathrm{residual}\\|^2 + \\lambda_{\\mathrm{ic}} \\|\\mathrm{IC}\\|^2 + \\lambda_{\\mathrm{bc}} \\|\\mathrm{BC}\\|^2\\) (+ optional sparse **data** term), often on **fixed** collocation/IC/BC grids with **Adam** + **gradient clipping** + **ReduceLROnPlateau** and optional **L-BFGS** polish—the learning task is **regression under PDE/ODE constraints**, not classification."
         ),
         tuning: "Loss weighting data vs. PDE terms; learning rate; many epochs may be needed.",
-        caseStudy: "Tutorial apparent-power constraint example; thermal/EM PDE contexts.",
+        caseStudy: "Review article apparent-power constraint example; thermal/EM PDE contexts.",
         paper: PAPER.piml_loss,
         links: repoLinks(
-          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.pinn2, NB.pimlReadme],
-          ["pinn_ode.ipynb (cooling ODE)", "pinn_pde.ipynb (Burgers PDE)", "prior_integration_example.ipynb", "prior_integration_example2.ipynb", "5_PIML/README.md"]
+          [NB.pinnOde, NB.pinnPde, NB.pinn1, NB.pimlReadme],
+          ["pinn_ode.ipynb (cooling ODE)", "pinn_pde.ipynb (Burgers PDE)", "prior_integration_example.ipynb", "5_PIML/README.md"]
         ),
         external: [{ label: "Physics-informed ML — Nature Reviews Physics survey (cited in paper)", href: "https://www.nature.com/articles/s42254-021-00314-5" }],
       },
@@ -588,8 +638,7 @@ const MODEL_PAIRS = {
           "**Output** is a **field tensor** aligned with targets (same **H×W** or a **super-resolution** target). **Loss** is **MSE/L1** on pixels (**supervised field regression**); optional **gradient** loss sharpens **interfaces**. Adding **PDE residuals** later turns the training objective into **physics-regularized** regression."
         ),
         tuning: "Convolution kernel sizes, depth; normalization layers.",
-        caseStudy:
-          "**Magnetic modeling** (`magnet_fnn.ipynb`); **scattered 3-D thermal** points: **`field_temperature_residual_fnn.ipynb`**.",
+        caseStudy: "**Dataset D7:** scattered 3-D thermal samples — **`field_temperature_residual_fnn.ipynb`** (`\\((x,y,z,\\text{loss},\\mathrm{Tamb}) \\rightarrow T\\)`). **Dataset D6:** **`magnet_fnn.ipynb`**.",
         paper: "Field data section contrasts image-like treatment vs. geometry-aware modeling.",
         links: repoLinks(
           [NB.magnetFnn, NB.fieldResidualFnn],
@@ -615,7 +664,7 @@ const MODEL_PAIRS = {
           "**Output heads** are **task-specific**: **linear** scalars (**MSE**), **softmax** (**CE**), etc. **Loss** is typically **Σ wᵢ Lᵢ** over tasks plus optional **auxiliary** self-supervised terms per branch—explicitly tying training to **multi-task** PE objectives (efficiency + hotspot + classification) when labels exist."
         ),
         tuning: "Per-branch widths, dropout, fusion choice; ablation recommended in paper.",
-        caseStudy: "**one_stop_AI_DAB_modulation.ipynb** multi-model workflow.",
+        caseStudy: "**Dataset D2:** **`one_stop_AI_DAB_modulation.ipynb`** multi-model workflow (Sec. VII-B–C).",
         paper: PAPER.nn_practice,
         links: repoLinks([NB.dabOne, NB.buckFull]),
         external: [],
@@ -631,16 +680,16 @@ const MODEL_PAIRS = {
       {
         name: "LSTM / GRU / 1D CNN / Transformer encoders",
         intro:
-          "Maps **waveform or spectrum** to **tabular** labels (efficiency class, fault, RMS stress). The encoder must respect **order** along time or frequency; the tutorial contrasts this with **sliding-window + MLP** that drops long-range and causal structure.",
+          "Maps **waveform or spectrum** to **tabular** labels (efficiency class, fault, RMS stress). The encoder must respect **order** along time or frequency; the review article contrasts this with **sliding-window + MLP** that drops long-range and causal structure.",
         architecture: arch(
           "The **input layer** presents **signal-domain** data as a **tensor (batch, channels, length)**: channels are **voltage/current** traces, **harmonic amplitudes**, or **spectral bins**. **Interface to modality:** the **ordering** along **length** is **meaningful** (time or frequency index)—you **normalize** amplitude and often **align** to a **switching edge** so phase is comparable across samples. This is **not** tabular: shuffling positions destroys **causality** and **locality**.",
-          "**Hidden** layers are **LSTM/GRU** stacks, **dilated 1D CNNs**, or **Transformer** blocks with **causal masks** where **future** must not leak into the representation. They **encode invariants** of **sequential locality** (neighboring samples related), **multi-scale** structure (ringing inside envelopes), and **causal** propagation—what the tutorial contrasts with **windowed MLPs**. **BiLSTM** only if **backward** context is **physically observable** (e.g. offline batch). **Pooling** (last state, **attention**, or **GAP**) **collapses** time to a **vector** for **tabular-style** targets.",
+          "**Hidden** layers are **LSTM/GRU** stacks, **dilated 1D CNNs**, or **Transformer** blocks with **causal masks** where **future** must not leak into the representation. They **encode invariants** of **sequential locality** (neighboring samples related), **multi-scale** structure (ringing inside envelopes), and **causal** propagation—what the review article contrasts with **windowed MLPs**. **BiLSTM** only if **backward** context is **physically observable** (e.g. offline batch). **Pooling** (last state, **attention**, or **GAP**) **collapses** time to a **vector** for **tabular-style** targets.",
           "The **output layer** is **linear** on the pooled embedding: **K** units for **K-way softmax** (**classification** of health mode / efficiency bin) or **one** unit per **regression** target (**MSE/Huber** loss). **Loss** directly implements the **supervised task**: match **labels** (fault class, RMS stress, efficiency). **Weighted CE** or **focal loss** address **rare** fault classes—still **supervised**, not generative."
         ),
         tuning: "Hidden size, layers, bidirectionality (check leakage), calibration to switching edges.",
         tricks:
           "Align windows to **switching edges** or fundamental frequency to reduce **phase ambiguity**; use **causal** masks for conv/Transformer when predicting **future** samples the system has not yet seen.",
-        caseStudy: "**time_series_modeling.ipynb** (DAB); RUL waveform inputs.",
+        caseStudy: "**Dataset D4:** **`time_series_modeling.ipynb`** (DAB time-domain, Sec. VII-E); RUL waveform inputs in **Dataset D5**.",
         paper: PAPER.signal_window,
         links: repoLinks([NB.dabTs, NB.rnn]),
         external: [],
@@ -673,12 +722,12 @@ const MODEL_PAIRS = {
         intro:
           "**Input trajectory** (e.g. reference command, grid disturbance) maps to **output trajectory** (current, voltage) with **shared** or **autoregressive** decoding so time alignment is explicit.",
         architecture: arch(
-          "**Input** is **signal → signal**: **source** sequence **(T_in × C)** (e.g. reference, disturbance). **Modality interface:** both ends are **ordered** along time or frequency; **channels** are **physically defined** measurements or references.",
+          "**Input** is **signal → signal**: **source** sequence \\((T_{\\mathrm{in}} \\times C)\\) (e.g. reference, disturbance). **Modality interface:** both ends are **ordered** along time or frequency; **channels** are **physically defined** measurements or references.",
           "**Hidden** **encoder** (**RNN/1D CNN/Transformer**) builds a **context** over the **input** invariant to **naive permutation** (it respects **order**). **Decoder** is **autoregressive** (**RNN** with previous output) or **cross-attention** to encoder states, with **causal** masks for **generation**. Invariants: **local smoothness**, **causality**, and often **multi-scale** transients inside slower envelopes.",
-          "**Output** is a **linear** projection **per step** to **target** **(T_out × C')**. **Loss:** **MSE/MAE** per step for **regression** of trajectories (**supervised seq2seq**); **CE** if each step is a **class**. **Scheduled sampling** bridges train/inference **exposure bias**—still tied to **predicting** a **known** target sequence."
+          "**Output** is a **linear** projection **per step** to **target** \\((T_{\\mathrm{out}} \\times C')\\). **Loss:** **MSE/MAE** per step for **regression** of trajectories (**supervised seq2seq**); **CE** if each step is a **class**. **Scheduled sampling** bridges train/inference **exposure bias**—still tied to **predicting** a **known** target sequence."
         ),
         tuning: "Teacher forcing, attention masks, sequence lengths.",
-        caseStudy: "Dataset III in tutorial; **time_series_modeling.ipynb**.",
+        caseStudy: "**Dataset D4:** **`time_series_modeling.ipynb`** (Dataset III, Sec. VII-E).",
         paper: PAPER.signal_window,
         links: repoLinks([NB.dabTs, NB.rnn]),
         external: [],
@@ -693,7 +742,7 @@ const MODEL_PAIRS = {
           "**Output** heads emit **waveforms** or **parameter** estimates. **Loss** = **MSE** vs. **measured** channels (**supervised** **trajectory regression**). The **learning task** is **match experiment** under **hard** physics **constraints** in the **hidden** update."
         ),
         tuning: "See PANN README for architecture constraints.",
-        caseStudy: "Tutorial PANN identification case.",
+        caseStudy: "Review article PANN identification case.",
         paper: "PANN fundamentals in review.",
         links: [{ label: "PANN README", href: ghBlob(NB.pannReadme) }],
         external: [],
@@ -701,7 +750,7 @@ const MODEL_PAIRS = {
     ],
   },
   signal_graph: {
-    summary: "Sequence encoders → graph decoder/generator—limited **local course notebooks**; use PyG/DGL externally.",
+    summary: "Sequence encoders → graph decoder/generator—**no GNN training `.ipynb`** in the repo; use PyG/DGL externally.",
     flags: { nn: true, mha: false, tinyml: false, piml: false },
     extras: { nn: true, mha: false, tinyml: false, piml: false },
     algorithms: [
@@ -737,9 +786,9 @@ const MODEL_PAIRS = {
           "**Output:** **field tensor** per time or **steady** map. **Loss:** **MSE** on **probes/pixels** (**supervised field regression**) + optional **λ**·**PDE residual**; **weighted sum** balances **data fit** vs. **physics**. **Task:** predict **fields** driven by **time-varying inputs**."
         ),
         tuning: "Multi-physics loss weights.",
-        caseStudy: "Magnetic + PINN tutorials complementary.",
+        caseStudy: "Magnetic (**Dataset D6:** `magnet_fnn.ipynb`, `magnet_lstm.ipynb`) + PINN notebooks (Sec. IV; VII-F).",
         paper: PAPER.piml_loss,
-        links: repoLinks([NB.pinn2, NB.magnetLstm]),
+        links: repoLinks([NB.pinn1, NB.magnetLstm, NB.magnetReadme]),
         external: [],
       },
     ],
@@ -777,7 +826,7 @@ const MODEL_PAIRS = {
           "**Graph-level** or **node-level** prediction: **message passing** aggregates neighbor features so the model sees **loops, parasitics paths, and layout** rather than a single categorical “layout ID”.",
         architecture: arch(
           "**Input layer** ingests **graph modality**: **node feature matrix** **X**, **edge index** or **adjacency**, optional **edge features**—each row of **X** is a **device/pad** with **physical attributes** (type, rating, sensor). The **interface** is **relational**: the model **indexes neighbors** through **edges**, not a fixed **grid**.",
-          "**Hidden:** **K** **message-passing** layers (**GCN/SAGE/GAT**) **aggregate** neighborhood information—this **encodes invariants** of **connectivity**, **local coupling**, and **multi-hop** influence (tutorial graph section). **Residual** links mitigate **over-smoothing**. **Readout** (**sum/mean/max** or **attention pool**) maps **variable-size** graphs to a **fixed vector** while **permutation** of node IDs is handled by **equivariant** ops + **invariant** pooling.",
+          "**Hidden:** **K** **message-passing** layers (**GCN/SAGE/GAT**) **aggregate** neighborhood information—this **encodes invariants** of **connectivity**, **local coupling**, and **multi-hop** influence (review article graph section). **Residual** links mitigate **over-smoothing**. **Readout** (**sum/mean/max** or **attention pool**) maps **variable-size** graphs to a **fixed vector** while **permutation** of node IDs is handled by **equivariant** ops + **invariant** pooling.",
           "**Output:** **softmax** (**graph classification**), **sigmoids** (**multi-label** faults), or **linear** (**regression** of KPI). **Loss** matches the **task**: **CE** for **exclusive** classes, **BCE** for **co-occurring** faults, **MSE** for **scalar** targets—each compares **head outputs** to **labels** for **supervised** learning on **graphs**."
         ),
         tuning: "Depth, over-smoothing mitigation, batching of graphs.",
@@ -918,7 +967,7 @@ const MODEL_PAIRS = {
         ),
         tuning: "Temporal alignment, downsampling of fields for speed.",
         caseStudy: "Partial overlap with magnetic sequence notebooks.",
-        paper: "Tutorial field/signal narrative.",
+        paper: "Review article field/signal narrative.",
         links: repoLinks([NB.magnetLstm, NB.rnn]),
         external: [],
       },
@@ -1121,7 +1170,7 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
     if (rlSpace === "cont") pathId = 51;
     else if (rlSpace === "disc") pathId = 52;
     else pathId = 53;
-    title = `Path ${pathId}: High-dimensional RL (${rlSpace === "cont" ? "continuous" : rlSpace === "disc" ? "discrete" : "hybrid"} action space)`;
+    title = `High-dimensional RL (${rlSpace === "cont" ? "continuous" : rlSpace === "disc" ? "discrete" : "hybrid"} action space)`;
     summary =
       "Deep RL (DDPG/SAC for continuous, DQN for discrete, parameterized actions for hybrid) for large policy/control parameter vectors. The repo’s **7_Reinforcement_Learning** folder includes **DDPG_buck_control.ipynb** (**continuous** duty, actor–critic, replay, soft target updates) and **RL_buck_control.ipynb** (**DQN**, discrete ΔD, replay, target net, Huber TD loss) on the **same averaged buck** surrogate—for full converters or scale, pair with **external RL frameworks** (e.g. Stable-Baselines3).";
     algorithms.push({
@@ -1129,15 +1178,15 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       intro:
         "**Policy π(a|s)** (actor–critic / SAC / DDPG) or **Q(s,a)** (**DQN** and variants for **discrete** actions): all map **state** (measurements / estimates) to **actions** (modulation, duty, references). **Reward** encodes tracking, losses, constraints—often dominates performance more than minor algorithm tweaks.",
       architecture: arch(
-        "**Input layer** is **state vector** **s** ( **voltages**, **currents**, **references**, **errors** )—same **normalization** as **supervised** **NN**; **interface** is **tabular** **→** **FC** **first** **weights**.",
-        "**Hidden:** **2–4** **FC** **layers** **learn** **nonlinear** **value**/**policy** **over** **state**—**invariants** are **implicit** **dynamics** **compressed** **into** **features** **(no** **explicit** **PDE** **unless** **you** **encode** **it** **in** **state** **or** **reward** **)**.",
-        "**Output:** **continuous** **action** **(tanh** **+** **scale**)** **or** **|A|** **Q** **values**/**logits**. **Loss:** **not** **label** **matching**—**policy** **gradient**/**Bellman** **MSE**/**entropy** **(SAC)** **optimize** **expected** **return** **from** **environment** **interaction**; **CE** **only** **if** **distilling** **teacher**."
+        "Inputs are state measurements (for example voltages, currents, reference errors), usually normalized as a fixed tabular vector.",
+        "The core model is a small fully connected network that maps state to policy/value estimates. It learns control behavior from interaction data, not from static labels.",
+        "Outputs are either continuous actions (DDPG/SAC) or Q-values for discrete actions (DQN). Training uses Bellman/policy objectives that maximize long-term reward."
       ),
       tuning:
         "Reward shaping, ε-greedy or entropy exploration, target nets, replay, gradient stabilization (e.g. Huber TD loss, clipping); sim-to-real gap for PE hardware.",
       caseStudy:
-        "**DDPG_buck_control.ipynb** (continuous duty) and **RL_buck_control.ipynb** (DQN, discrete ΔD) on the averaged buck; paper’s RL discussion for broader literature.",
-      paper: "RL section + reward engineering citations.",
+        "**DDPG_buck_control.ipynb** (continuous duty) and **RL_buck_control.ipynb** (DQN, discrete ΔD) on the averaged buck (Sec. III-D); review article RL discussion for broader literature.",
+      paper: "**Sec. III-D** — RL section + reward engineering citations.",
       links: repoLinks(
         [NB.rl, NB.rlBuckDdpg, NB.rlBuck],
         ["README.md (RL folder)", "DDPG_buck_control.ipynb (DDPG)", "RL_buck_control.ipynb (DQN)"]
@@ -1157,6 +1206,8 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
       flags,
       extras,
       scarceHtml: "",
+      pathReviewExcerpt:
+        "Sec. III-D frames high-dimensional control optimization as RL: define state/action carefully, design reward around PE goals and constraints, and report multi-seed stability before hardware transfer.",
       reviewContextHtml: `${OPTIMIZATION_REVIEW_HTML}<ul class="report-list"><li>${PAPER.mha_stats}</li><li>Reward and environment fidelity often dominate over the specific RL algorithm—document assumptions.</li></ul>`,
     };
   }
@@ -1170,7 +1221,7 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
   else if (!single && space === "disc") pathId = 58;
   else pathId = 59;
 
-  title = `Path ${pathId}: Low-dimensional ${moo ? "multi-objective" : "single-objective"} MHA (${space === "cont" ? "continuous" : space === "disc" ? "discrete" : "hybrid"} space)`;
+  title = `Low-dimensional ${moo ? "multi-objective" : "single-objective"} MHA (${space === "cont" ? "continuous" : space === "disc" ? "discrete" : "hybrid"} space)`;
   summary =
     "Meta-heuristics navigate nonlinear/discontinuous objectives. **PSO/DE** for continuous vector spaces; **GA** for mixed variables; **NSGA-II/III** for Pareto fronts. Integrate **statistical comparison** across stochastic runs.";
 
@@ -1185,7 +1236,7 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
         "The **output layer** is the next candidate population and current best solution. The optimization **loss/objective** is the task cost (with penalties for constraints), minimized iteratively. This ties directly to single- or multi-objective PE design search rather than supervised label fitting."
       ),
       tuning: PAPER.mha_explore + " See **pso_hyp_tuning.ipynb** for inertia schedules.",
-      caseStudy: "**buck_design_PSO.ipynb**; DAB modulation stress minimization in tutorial.",
+      caseStudy: "**buck_design_PSO.ipynb**; DAB modulation stress minimization in the review article.",
       paper: PAPER.mha_stats,
       links: repoLinks([NB.singMha, NB.buckPso, NB.psoTune, NB.algoStats, NB.mhaReadme]),
       external: [{ label: "SciPy optimization cookbook (reference)", href: "https://docs.scipy.org/doc/scipy/reference/optimize.html" }],
@@ -1254,6 +1305,8 @@ export function buildOptimizationRecommendation(dim, rlSpace, moo, space) {
     flags,
     extras,
     scarceHtml: "",
+    pathReviewExcerpt:
+      "Sec. V recommends matching optimizer to search space (continuous, discrete, or hybrid), then validating stochastic results with statistical comparison rather than one best run.",
     reviewContextHtml: `${OPTIMIZATION_REVIEW_HTML}<ul class="report-list"><li>${PAPER.mha_stats}</li></ul>${mooHtml}`,
   };
 }
@@ -1280,7 +1333,7 @@ export function buildProcessRecommendation(kind) {
             tuning:
               "Sampling density (LHS points), timeout/retry policy, parser validation rules, and data schema checks before model training.",
             caseStudy: "PLECS and LTspice automation notebooks in the simulation automation section.",
-            paper: "Simulation batch-acquisition flow in the tutorial process-automation discussion.",
+            paper: "Simulation batch-acquisition flow in the review article process-automation discussion.",
             links: repoLinks([NB.ltspice, NB.plecs, NB.simReadme]),
             external: [],
           },
@@ -1297,7 +1350,7 @@ export function buildProcessRecommendation(kind) {
             ),
             tuning:
               "Retriever quality, tool-routing policies, guardrails, and evaluation on task success + hallucination rate + execution reliability.",
-            caseStudy: "PE-GPT style design-assistant workflow in the tutorial’s agentic AI section.",
+            caseStudy: "PE-GPT style design-assistant workflow in the review article’s agentic AI section.",
             paper: PAPER.agentic_stack,
             links: repoLinks([NB.agentic]),
             external: [{ label: "PE-GPT paper (IEEE TIE 2025)", href: "https://ieeexplore.ieee.org/document/10918566" }],
@@ -1306,6 +1359,9 @@ export function buildProcessRecommendation(kind) {
     flags: { nn: false, mha: false, tinyml: false, piml: false },
     extras: { nn: !isSim, mha: false, tinyml: false, piml: false },
     scarceHtml: "",
+    pathReviewExcerpt: isSim
+      ? "Sec. III-A presents simulation automation as the data backbone: sample the design space, run batches reproducibly, and build clean datasets before training."
+      : "Sec. VI presents agentic AI as a guided loop: plan, call tools, check outputs, and keep human oversight for critical PE decisions.",
     reviewContextHtml: isSim
       ? `<p class="paper-note"><strong>Data for ML:</strong> LHS/grid batches feed the <strong>generic ML workflow</strong> (acquisition → EDA → train → tune → deploy). Reuse ${ghBlob(NB.plecs)} patterns for structured sweeps.</p>`
       : `<p class="paper-note">${PAPER.agentic_stack}</p>`,
@@ -1313,7 +1369,7 @@ export function buildProcessRecommendation(kind) {
       ? [
           {
             title: "Simulation automation resources",
-            html: `<p>Batch acquisition loops (LHS/grid) are described in the tutorial. Use tool-specific APIs:</p>
+            html: `<p>Batch acquisition loops (LHS/grid) are described in the review article. Use tool-specific APIs:</p>
             <ul class="link-list">
               <li><a href="${ghBlob(NB.ltspice)}" target="_blank" rel="noopener">LTspiceAutomation/LTspiceAtuomate.ipynb</a></li>
               <li><a href="${ghBlob(NB.plecs)}" target="_blank" rel="noopener">PlecsAutomation/Data acquisition.ipynb</a></li>
@@ -1323,8 +1379,8 @@ export function buildProcessRecommendation(kind) {
         ]
       : [
           {
-            title: "Agentic AI resources",
-            html: `<p>Course documentation + PE-GPT reference (paper § agentic AI).</p>
+            title: "Agentic AI — GitHub Jupyter Notebook Materials",
+            html: `<p>GitHub documentation + PE-GPT reference (Sec. VI).</p>
             <ul class="link-list">
               <li><a href="${ghBlob(NB.agentic)}" target="_blank" rel="noopener">6_Agentic_AI/README.md</a></li>
               <li><a href="https://ieeexplore.ieee.org/document/10918566" target="_blank" rel="noopener">F. Lin et al., PE-GPT, IEEE TIE 2025</a> (verify open access / DOI at your institution)</li>
@@ -1345,15 +1401,15 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Reinforcement learning control",
       intro:
-        "Same **value-based** (**DQN** for **discrete** actions) or **actor–critic** (**DDPG** for **continuous** duty / references) picture as design RL, but **states** and **actions** update at **control rate**. **Safety filters** (limits, Lyapunov-style shields) often wrap NN outputs on hardware. Use **DDPG_buck_control.ipynb** (continuous) and **RL_buck_control.ipynb** (discrete ΔD) as paired tutorials on the **averaged** buck.",
+        "Same **value-based** (**DQN** for **discrete** actions) or **actor–critic** (**DDPG** for **continuous** duty / references) picture as design RL, but **states** and **actions** update at **control rate**. **Safety filters** (limits, Lyapunov-style shields) often wrap NN outputs on hardware. Pair **DDPG_buck_control.ipynb** (continuous) and **RL_buck_control.ipynb** (discrete ΔD) on the **averaged** buck.",
       architecture: arch(
-        "**Input** is **observation** **vector** **(or** **short** **waveform** **→** **1D** **CNN** **stem**)** **from** **sensors**/**estimator**—**interface** **maps** **physical** **signals** **to** **fixed** **dim** **before** **control** **head**.",
-        "**Hidden:** **FC**/**CNN** **layers** **encode** **feasible** **control** **responses** **to** **state** **trajectories**—**invariants** **learned** **from** **reward** **shaping**, **not** **from** **static** **labels**.",
-        "**Output:** **|A|** **Q-values**/**logits** (**DQN**) **or** **continuous** **action** (**tanh**+scale **for** **DDPG/SAC**). **Loss:** **Bellman**/**TD** **on** **Q** **(with** **target** **net**/**Double** **DQN)** **or** **policy-gradient**/**entropy** **objectives**; **optional** **BC** **MSE** **pretrain** **then** **fine-tune** **with** **RL**."
+        "Inputs are sensor/observer signals packed into a state vector (or short encoded waveform features).",
+        "The core model is FC/CNN policy-value layers that learn control response from reward-driven trajectories.",
+        "Outputs are discrete-action Q-values (DQN) or continuous actions (DDPG/SAC). Training uses TD/Bellman or policy-gradient objectives, optionally with behavior-cloning warm start."
       ),
       tuning: "Reward engineering dominates; ε-greedy / exploration noise; target nets and replay for off-policy Q-learning; safety filters for hardware.",
-      caseStudy: "**DDPG_buck_control.ipynb** / **RL_buck_control.ipynb** (same buck); tutorial RL control surveys.",
-      paper: "RL control subsection.",
+      caseStudy: "**DDPG_buck_control.ipynb** / **RL_buck_control.ipynb** (same buck, Sec. III-D); review article RL control surveys.",
+      paper: "**Sec. III-D** — RL control subsection.",
       links: repoLinks(
         [NB.rl, NB.rlBuckDdpg, NB.rlBuck],
         ["README.md (RL folder)", "DDPG_buck_control.ipynb (DDPG)", "RL_buck_control.ipynb (DQN)"]
@@ -1364,16 +1420,16 @@ export function buildControlRecommendation(policy, deploy) {
     algos.push({
       name: "Imitation / surrogate control (NN)",
       intro:
-        "**Supervised** learning: **state** (or error vector) → **control action** that matches **teacher** (MPC, PID bank). **Shallow-wide** MLPs often preferred for **latency** on MCUs (tutorial TinyML narrative).",
+        "**Supervised** learning: **state** (or error vector) → **control action** that matches **teacher** (MPC, PID bank). **Shallow-wide** MLPs often preferred for **latency** on MCUs (review article TinyML narrative).",
       architecture: arch(
-        "**Input** **matches** **teacher** **features** **(references**, **states**, **limits**)**—**tabular** **interface** **identical** **to** **classical** **controller** **inputs**.",
-        "**Hidden:** **shallow** **wide** **FC** **for** **MCU** **latency**—**invariants** **are** **smooth** **mappings** **from** **state** **to** **action** **imitated** **from** **demos**.",
-        "**Output:** **linear** **head** **→** **action** **vector**. **Loss:** **MSE**/**Huber** **‖a_student** **−** **a_teacher**‖**—** **pure** **supervised** **imitation**; **optional** **KL**/**T** **for** **soft** **teacher**; **rate/sat** **in** **loss** **or** **post** **clamp**."
+        "Inputs are the same controller features used by the teacher (references, states, limits).",
+        "The core model is often a shallow-wide MLP to keep latency low on MCU/FPGA targets.",
+        "Output is control action. Train with supervised loss to match teacher commands, then enforce rate/saturation limits in loss or post-processing."
       ),
       tuning: "Distillation temperature, dataset coverage of operating points.",
-      caseStudy: "Tutorial imitation/MPC surrogate references.",
-      paper: "Control section + TinyML deployment discussion.",
-      links: repoLinks([NB.nnBasics, NB.dabTs]),
+      caseStudy: "Review article imitation/MPC surrogate references (Sec. III-F); **`NN_basics.ipynb`** and **`good_practice_NN.ipynb`** for shallow-wide MCU-friendly nets.",
+      paper: "**Sec. III-F; VII-D** — control + TinyML deployment discussion.",
+      links: repoLinks([NB.nnBasics, NB.nnGood]),
       external: [],
     });
   }
@@ -1384,12 +1440,12 @@ export function buildControlRecommendation(policy, deploy) {
       intro:
         "Not a new **topology**—**compress** the deployed **actor/imitation** net: **INT8** weights, **pruning**, **operator fusion** in **ONNX Runtime** / **TFLite**; keep **shallow-wide** for deterministic cycle time.",
       architecture: arch(
-        "**Input/output** **topology** **unchanged** **from** **FP32** **student**—**quantization** **is** **weight**/**activation** **discretization**, **not** **new** **modality** **interface**.",
-        "**Hidden:** **INT8** **matmul** **approximates** **same** **FC**/**Conv** **maps**—**invariant** **structure** **preserved** **under** **bounded** **error** **if** **calibrated** **well**.",
-        "**Loss:** **during** **QAT** **matches** **full** **precision** **task** **(MSE**/**CE**/**RL** **surrogate**)**; **PTQ** **uses** **calibration** **batch** **only** **for** **scale**—**deployment** **metric** **is** **latency**/**power**, **learned** **via** **same** **objective** **as** **before** **compression**."
+        "Model inputs/outputs stay the same as the FP32 version. Quantization changes numeric precision, not data interface.",
+        "The core computation switches to INT8-friendly operators while keeping the same network structure.",
+        "For QAT, keep the original task loss and include quantization effects during training. For PTQ, calibrate scales on representative data and verify latency/accuracy trade-off."
       ),
       tuning: PAPER.tinyml,
-      caseStudy: "**TinyML.ipynb** DAB online adapter; paper §VII TinyML + ONNX 5× speedup.",
+      caseStudy: "**Dataset D3:** **`TinyML.ipynb`** DAB online adapter (Sec. VII-D); ONNX ~5× speedup in manuscript.",
       paper: PAPER.tinyml,
       links: repoLinks([NB.tinyml, NB.dabOne]),
       external: [
@@ -1408,6 +1464,9 @@ export function buildControlRecommendation(policy, deploy) {
     flags,
     extras,
     scarceHtml: "",
+    pathReviewExcerpt: rl
+      ? "Sec. III-D explains RL control in PE: reward design and safe operating constraints usually matter more than choosing between similar RL variants."
+      : "Sec. III-F and Sec. VII-D emphasize practical controller surrogates: start with simple supervised mappings and check latency limits early for deployment.",
     reviewContextHtml: `<ul class="report-list"><li>${PAPER.nn_scaling}</li><li>${online ? PAPER.tinyml : PAPER.signal_window}</li></ul>`,
   };
 }
@@ -1439,7 +1498,7 @@ export function buildUnsupervisedFDDRecommendation(modality) {
               "The **output layer** is an anomaly score from graph reconstruction error, latent distance to a normal center, or one-class decision value. **Loss/objective** is unsupervised graph reconstruction or compactness on healthy graphs, then thresholding creates anomaly decisions."
             ),
             tuning: "Pooling choice, graph depth vs. over-smoothing, negative-edge sampling for reconstruction, and alert-threshold calibration.",
-            caseStudy: "Graph-specific FDD is tutorial-aligned but course materials mainly point to **Graph_NN/README.md** and external GNN tooling.",
+            caseStudy: "Graph-specific FDD is review-article-aligned (Sec. II-D) but the GitHub repo points to **Graph_NN/README.md** and external GNN tooling—no local GNN training notebook.",
             links: repoLinks([NB.graphNN, "4_Neural_Network/README.md"], ["Graph_NN/README.md", "4_Neural_Network/README.md"]),
           }
         : modality === "unstructured"
@@ -1453,7 +1512,7 @@ export function buildUnsupervisedFDDRecommendation(modality) {
                 "The **output layer** is either a reconstructed image or an anomaly score from latent distance / one-class head. **Loss/objective** is reconstruction **MSE/L1** or one-class compactness on normal-only images, with thresholding used for detection."
               ),
               tuning: "Augmentation policy, bottleneck width, camera-domain consistency, and threshold selection under class imbalance.",
-              caseStudy: "Tutorial unstructured-data discussion and thermal-imaging diagnostic references.",
+              caseStudy: "Review article unstructured-data discussion and thermal-imaging diagnostic references.",
               links: repoLinks([NB.nnBasics]),
             }
           : {
@@ -1466,14 +1525,14 @@ export function buildUnsupervisedFDDRecommendation(modality) {
                 "The **output layer** is an anomaly score such as path length, density likelihood, or distance to a learned center. **Loss/objective** is unsupervised density/one-class fitting on normal-only samples, then thresholding yields anomaly alarms."
               ),
               tuning: "Contamination rate, kernel scale, feature scaling, and threshold selection using held-out healthy/anomalous windows where possible.",
-              caseStudy: "DAB **Isolation Forest / One-Class SVM** examples in **one_stop_AI_DAB_modulation.ipynb**.",
-              links: repoLinks([NB.dabOne, NB.ensemble, NB.classic]),
+              caseStudy: "DAB **Isolation Forest / One-Class SVM** in **`one_stop_AI_DAB_modulation.ipynb`** (Dataset D2); tabular baselines in **`classic_ML.ipynb`**.",
+              links: repoLinks([NB.classic, NB.ensemble, NB.dabOne]),
             };
   return {
     pathId: null,
     title: `Maintenance — Unsupervised anomaly detection (${modality})`,
     summary:
-      "Train on **normal** operation only; flag deviations using modality-appropriate one-class or reconstruction models, with EDA and threshold calibration following the tutorial.",
+      "Train on **normal** operation only; flag deviations using modality-appropriate one-class or reconstruction models, with EDA and threshold calibration following the review article.",
     algorithms: [
       {
         name: variant.name,
@@ -1489,6 +1548,8 @@ export function buildUnsupervisedFDDRecommendation(modality) {
     flags: { nn: true, mha: false, tinyml: false, piml: false },
     extras: { nn: true, mha: false, tinyml: false, piml: false },
     scarceHtml: "",
+    pathReviewExcerpt:
+      "Sec. III and maintenance case studies recommend normal-only modeling when labels are missing: build a clean healthy baseline, then calibrate thresholds with realistic operating variation.",
     reviewContextHtml: MAINTENANCE_REVIEW_HTML,
     tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
   };
@@ -1563,6 +1624,8 @@ export function buildSSLFDDRecommendation(modality) {
     flags: { nn: true, mha: false, tinyml: false, piml: false },
     extras: { nn: true, mha: false, tinyml: false, piml: false },
     scarceHtml: "",
+    pathReviewExcerpt:
+      "Sec. III highlights semi-supervised learning for costly fault labels: combine few labeled samples with many unlabeled runs, and watch for confirmation bias in pseudo-labels.",
     reviewContextHtml: MAINTENANCE_REVIEW_HTML,
     tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
   };
@@ -1589,10 +1652,10 @@ export function buildFDDRecommendation(task, modality) {
         "The **hidden mechanism** depends on model family: margins/kernels (SVM), neighborhood geometry (kNN), linear log-odds interactions (logistic), or tree partitions (ensembles). These capture invariants of separability and feature-threshold interactions in fault space.",
         "The **output layer** is class probability/logit (binary or multiclass) or multi-label logits when configured. **Loss/objective** aligns to supervised FDD: cross-entropy/logistic loss for labels, with class weighting for imbalance; predictions map directly to health-state classification tasks."
       ),
-      tuning: "Class imbalance, calibration, feature scaling; anomaly: train only on normal data.",
-      caseStudy: "DAB **Isolation Forest / One-Class SVM** in **one_stop_AI_DAB_modulation.ipynb**.",
-      paper: "FDD + unsupervised subsection.",
-      links: repoLinks([NB.classic, NB.ensemble, NB.dabOne]),
+      tuning: "Class imbalance, calibration, feature scaling.",
+      caseStudy: "**classic_ML.ipynb** (SVM, kNN, logistic); **ensemle_learning.ipynb** (XGBoost, RF); **ridge_polynomial_regression.ipynb** for smooth polynomial baselines.",
+      paper: "**Sec. III-B–III-E** — supervised FDD on tabular features.",
+      links: repoLinks([NB.classic, NB.ensemble, NB.ridgePoly]),
       external: [],
     });
   } else if (modality === "signal") {
@@ -1606,9 +1669,9 @@ export function buildFDDRecommendation(task, modality) {
         "The **output layer** uses softmax for mutually exclusive faults, sigmoid for multi-label faults, or linear heads for regression-style health indices. **Loss** is CE/BCE/MSE according to task, with class weighting/focal variants for imbalance in labeled FDD."
       ),
       tuning: "Window length, bidirectional LSTM only if causality allows.",
-      caseStudy: "**rnn_basics.ipynb**; **attention_fdd.ipynb** (PV plant waveforms, Transformer-style encoder + early stopping); DAB modulation classification.",
+      caseStudy: "**rnn_basics.ipynb**; DAB modulation classification (**one_stop_AI_DAB_modulation.ipynb**); waveform modeling (**time_series_modeling.ipynb**).",
       paper: PAPER.signal_window,
-      links: repoLinks([NB.rnn, NB.attentionFdd, NB.dabOne], ["rnn_basics.ipynb", "attention_fdd.ipynb (PV FDD)", "one_stop_AI_DAB_modulation.ipynb"]),
+      links: repoLinks([NB.rnn, NB.dabOne, NB.dabTs], ["rnn_basics.ipynb", "one_stop_AI_DAB_modulation.ipynb", "time_series_modeling.ipynb"]),
       external: [],
     });
   } else if (modality === "graph") {
@@ -1624,7 +1687,7 @@ export function buildFDDRecommendation(task, modality) {
       tuning: "Graph batching, dropout on edges; watch **over-smoothing** in deep stacks; readout (pool) choice affects fault separability.",
       tricks:
         "Start with **GCN / GraphSAGE / GAT** baselines; temporal faults may need **temporal GNN** or sequence+graph hybrids.",
-      caseStudy: "Paper graph examples; course **Graph_NN** README for survey links (GML2023, Awesome GNN).",
+      caseStudy: "Paper graph examples (Sec. II-D); **Graph_NN/README.md** for survey links (GML2023, Awesome GNN).",
       paper: PAPER.graph_invariants,
       links: repoLinks([NB.graphNN, "4_Neural_Network/README.md"], ["Graph_NN/README.md", "4_Neural_Network/README.md"]),
       external: [
@@ -1665,7 +1728,7 @@ export function buildFDDRecommendation(task, modality) {
       tuning: "Pos_weight per label; threshold tuning on validation.",
       caseStudy: "Paper multi-label vs multi-class distinction.",
       paper: "Problem configuration paragraph.",
-      links: repoLinks([NB.ensemble]),
+      links: repoLinks([NB.ensemble, NB.classic]),
       external: [],
     });
   }
@@ -1679,6 +1742,8 @@ export function buildFDDRecommendation(task, modality) {
     flags,
     extras,
     scarceHtml: "",
+    pathReviewExcerpt:
+      "Sec. III-B/III-E frame FDD around data quality and task definition first: binary vs multi-class vs multi-label, then modality-matched models and threshold/calibration checks.",
     tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
     reviewContextHtml: `${MAINTENANCE_REVIEW_HTML}${multilabelNote}`,
   };
@@ -1768,7 +1833,7 @@ export function buildRULRecommendation(inMod, probabilistic) {
       intro: probabilisticVariant.intro,
       architecture: probabilisticVariant.architecture,
       tuning: "Variance floor; check calibration; MDN mixture count.",
-      caseStudy: "**rul_prediction.ipynb** (IGBT NASA dataset); paper Fig. on uncertainty bands.",
+      caseStudy: "**Dataset D5:** **`rul_prediction.ipynb`** (NASA IGBT); uncertainty bands in Sec. VII-F.",
       paper: "RUL section — uncertainty grows in sparse regions.",
       links: probabilisticVariant.links,
       external: [],
@@ -1779,7 +1844,7 @@ export function buildRULRecommendation(inMod, probabilistic) {
       intro: deterministicVariant.intro,
       architecture: deterministicVariant.architecture,
       tuning: "Sequence length for LSTM; early stopping.",
-      caseStudy: "**rul_prediction.ipynb** backbone comparisons.",
+      caseStudy: "**Dataset D5:** **`rul_prediction.ipynb`** backbone comparisons (Sec. VII-F).",
       paper: "RUL modeling subsection.",
       links: deterministicVariant.links,
       external: [],
@@ -1790,29 +1855,35 @@ export function buildRULRecommendation(inMod, probabilistic) {
     pathId: null,
     title: `Maintenance — RUL (${inMod} inputs, ${probabilistic ? "probabilistic" : "deterministic"})`,
     summary:
-      `RUL path for **${modLabel}** inputs. Degradation trajectories from the NASA IGBT tutorial case motivate ${probabilistic ? "**uncertainty-aware**" : "**point-estimate**"} prognostics depending on decision risk.`,
+      `RUL path for **${modLabel}** inputs. Degradation trajectories from the NASA IGBT case study motivate ${probabilistic ? "**uncertainty-aware**" : "**point-estimate**"} prognostics depending on decision risk.`,
     algorithms: algos,
     flags,
     extras,
     scarceHtml: "",
+    pathReviewExcerpt: probabilistic
+      ? "Sec. VII-F recommends uncertainty-aware RUL when operating regimes are sparse or shifting, so confidence bands widen outside dense training regions."
+      : "Sec. VII-F supports deterministic RUL when data coverage is strong and decision margins are wider, with careful temporal validation.",
     tutorialPipelineHtml: TUTORIAL_ML_PIPELINE,
     reviewContextHtml: `${MAINTENANCE_REVIEW_HTML}<p class="paper-note">Sparse or extrapolated regimes: uncertainty-aware heads (Gaussian / mixture) should show wider bands where data are thin.</p>`,
   };
 }
 
 /**
- * Abridged excerpts aligned with review_extracted.txt / the IEEE TIE invited tutorial.
+ * Abridged excerpts aligned with review_extracted.txt / the IEEE TIE invited review article.
  * Rendered with inline **bold** / *italic* → HTML in the app.
  */
 export const ARTICLE = {
+  whatWhichHow:
+    "This selector and the [**Fundamentals_of_AI_for_PE**](https://github.com/XinzeLee/Fundamentals_of_AI_for_PE) GitHub notebooks follow the review article **What–Which–How** framework: **(1) What** — what PE problems can be solved by AI (identifying lifecycle phase, specific task, and data modality); **(2) Which** — which AI models fit this problem (mapping the PE task and data formats to classic ML, ensemble learning, NNs, PIML, MHAs, RL, or agentic AI); **(3) How** — how to tune these AI models effectively under PE-specific learning settings (data preprocessing, architecture design, optimizer tuning, and integrating PE insights).",
+
   framing:
-    "The article is a **foundation guideline**, not a catalog of latest papers: it helps readers answer **when** AI is useful in PE, **what** methods fit the task and data modality, and **how** to design solutions. A central premise is that **PE data are diverse** (tabular, signal, field, graph, unstructured)—effective modeling requires matching **invariances** to model classes.",
+    "The article serves as a **foundation guideline** for the PE community, rather than just a catalog of the latest research. It addresses three key questions: **when** AI methods are useful, **what** types of AI approaches align with different PE problems and data modalities, and **how** AI solutions can be designed and implemented effectively. A central premise is that **PE data are inherently diverse** (spanning tabular, signal-domain, field, graph, and hybrid formats)—effective AI modeling requires explicit awareness of these data formats and their corresponding **invariances**.",
 
   mha_core:
     "**MHAs** are generic, problem-independent optimizers guided by strategic rules. Each candidate is evaluated with an **objective function**; constraints enter via **penalty terms**. The **output space** informs search in the **input space**—physical mapping varies by application (design variables vs. performance metrics, control actions, or identification residuals). **Algorithm selection** should reflect input/output space structure: **PSO/DE** for continuous vectors, **SA/ACO** for discrete moves, **GA** for **hybrid** mixed variables, and **multi-objective variants** when Pareto fronts matter.",
 
   mha_tuning_article:
-    "**Hyperparameter tuning** balances **global exploration** vs. **local exploitation**—often emphasize exploration early, then exploitation (e.g. **PSO inertia** schedules). If the landscape is **multi-modal**, **niching** helps; if regions are **steep**, **gradient-informed** heuristics can accelerate convergence.",
+    "**Hyperparameter tuning** of MHAs centers on achieving an appropriate balance between **global exploration** and **local exploitation**. A common practice is to emphasize global exploration in early iterations to thoroughly search the input space, then gradually shift toward stronger local exploitation to refine solutions and accelerate convergence (e.g., linearly decreasing **PSO inertia** weight). If the objective landscape is **multi-modal**, **niching** strategies with clustering-penalty mechanisms facilitate tracking multiple global optima. If regions contain **steep gradients**, **gradient-informed** heuristics can be integrated to search more efficiently.",
 
   stats:
     "**Statistical testing** is essential because stochastic algorithms vary across runs. The **t-test** compares **two** algorithms; **ANOVA** applies to **three or more**. Report **p-values** and which mean is better—small **p** supports rejecting “no difference.”",
@@ -1824,52 +1895,52 @@ export const ARTICLE = {
     "**RL** learns policies by **interaction** and **rewards**, often as a **Markov decision process**. **Discrete** action sets often use **value-based** methods (**DQN** and variants: replay, target networks, Double DQN); **continuous** control commonly uses **actor–critic** or **policy-gradient** algorithms (**DDPG**, **SAC**, …). **Reward design** is critical—it encodes objectives and trade-offs (steady-state vs. transient). RL suits **control** (converter as environment) and **high-dimensional** sequential decisions; compare runs with multiple **seeds** and statistical tests.",
 
   ml_workflow:
-    "Data-driven projects follow a **generic ML workflow**: (1) **data acquisition**, (2) **EDA and preprocessing**, (3) **model training**, (4) **hyperparameter tuning**, (5) **deployment**. **Steps 2–4 loop**: poor predictions often signal **bad data** or **outliers**—return to **EDA**.",
+    "Data-driven PE projects typically follow a **generic ML workflow**: (1) **data acquisition**, (2) **exploratory data analysis (EDA) and data preprocessing**, (3) **ML model training**, (4) **hyperparameter tuning**, and (5) **deployment and execution** of the trained model. Steps 2-4 form an **iterative loop**: misclassified or incorrect predictions identified during Step 4 indicate potential data outliers, prompting a rewind to Step 2 for EDA and data preprocessing.",
 
   eda:
-    "**EDA** examines data from multiple views—**histograms** show spread, skew, modality; **correlation maps** reveal redundant or uninformative features and latent **equality constraints** (e.g. dependent phase-shift variables in DAB). **t-SNE** visualizes manifolds: clusters indicate regimes; **gaps** flag **sparse** or **interpolation** risks and motivate **partitioning** or **transfer learning**.",
+    "**EDA** examines data from multiple perspectives to uncover latent properties and inform modeling decisions. **Histograms** visualize feature distributions, revealing spread, skewness, and modality to guide preprocessing. **Correlation maps** quantify pairwise relationships to identify influential, redundant, or uninformative features, and facilitate the discovery of latent **equality constraints** (e.g., dependent phase-shift variables in DAB converters). **t-SNE** projects high-dimensional data into a low-dimensional space to visualize manifolds: natural clusters indicate distinct operating regimes, while sparse empty regions flag **interpolation** risks and motivate refined modeling strategies such as data partitioning or **transfer learning**.",
 
   eda_short:
     "For diagnostics and health tasks, the same **EDA** ideas apply: visualize distributions and dependencies before committing to a model family.",
 
   tabular_pe:
-    "**Tabular** data use labeled rows/columns of **numerical** and **categorical** variables. A defining trait is **rotation variance**: **reordering columns destroys meaning** because each column is a physically defined feature. That differs from waveforms and images where structure is tied to continuity.",
+    "**Tabular** data are a form of structured data with predefined, consistently labeled fields organized into rows and columns, commonly including **numerical** data (continuous values like efficiency, cost, device ratings) and **categorical** data (discrete labels like fault type, topology class). A defining characteristic is **rotation variance**: **reordering or rotating the table leads to meaning loss** because each column encodes a physically founded feature. This differs from waveforms or images which retain their physical pattern when shifted.",
 
   signal_pe:
-    "**Signal-domain** data are **1-D sequences** with **locality**, **hierarchical composition** (fine patterns inside coarse envelopes), and **causality**. **Sliding-window tabularization** plus generic tabular ML is common but **ill-posed**: it breaks causality, drops long-horizon dependence, and treats ordered samples as independent slots—prefer models that respect **sequence structure** (RNN, 1D CNN, causal attention).",
+    "**Signal-domain** data (e.g., time-domain waveforms and frequency-domain spectra) are fundamentally **1-D multi-channel sequences** with built-in **locality** (neighboring features carry related information), **hierarchical composition** (fine-scale patterns embedded within coarse-scale behaviors), and domain-specific **causality** (temporal or spectral ordering of events). **Sliding-window segmentation** into tabular formats is often **ill-posed** because it breaks causality, discards long-horizon dependencies, and treats sequentially ordered samples as independent feature slots.",
 
   graph_pe:
-    "**Graph** data encode **topological connectivity**, **locality**, and **multi-hop dependency**—relevant to topologies, PCBs, and layouts. **Graph-based representations** can generalize beyond treating layout as a single categorical code.",
+    "**Graph** data are relational in nature, revealing **topological connectivity** (node linkages and information flow), **locality** (localized effects within a neighborhood), and **multi-hop dependency** (influence propagating through successive connections). Relevant to circuit topologies, control diagrams, and PCB layouts, graph-based learning can reason about relational connectivity, promoting flexibility and generalization to unseen layouts compared to treating layouts as uninformative categorical variables.",
 
   field_pe:
-    "**Field** samples pair coordinates with quantities (flux, temperature, stress). **Invariances** include **geometry** and **multi-physics laws** (often **PDEs**). **Downsampled point clouds** \\((x,y,z)\\) with global conditions (e.g. loss, ambient **T**) → local **T** are covered by **`field_temperature_residual_fnn.ipynb`**. Treating fields like plain images may **neglect physics and boundaries**—**geometry-aware** or **physics-informed** models are needed when fidelity matters.",
+    "**Field** data are represented on pixel-based or voxel-based grids consisting of spatial coordinates paired with field quantities (e.g., current density, magnetic flux, temperature). Feature invariances include the **geometry of the hardware structure** and **multi-physics laws** governed by partial differential equations (PDEs) which imply smoothness, continuity, and boundary-dependent behaviors. Converting field data into tabular form obscures these latent physical relationships; therefore, ML models that can embed governing equations and support **geometry-aware operators** are required.",
 
   hybrid_pe:
-    "**Hybrid** inputs fuse modalities; **multi-branch** encoders and **fusion** (concat, gating, attention) are typical—balance capacity and **Occam’s razor** (justify complexity with gains).",
+    "**Hybrid** inputs fuse modalities. NNs can jointly process heterogeneous data formats through feature concatenation, embedding fusion, and **multi-branch** architectures. For example, numerical features can be encoded by feedforward layers, time-domain waveforms by temporal encoders, and material types by categorical embeddings, before being concatenated into a unified latent representation.",
 
   learning_types:
-    "Before choosing an algorithm, fix the **learning type**: **supervised** (labeled I/O), **unsupervised** (structure/anomaly without labels), **semi-supervised** (few labels + many unlabeled samples—promising for **FDD** when labeling is costly), or **RL** (policy from rewards). **Multi-class** vs. **multi-label** matters when **faults can co-occur**—use **sigmoid + BCE** per class, not a single **softmax**.",
+    "Before choosing an algorithm, it is essential to formulate the **learning type**: **supervised** (SL, learning from labeled input-output pairs for regression or classification), **unsupervised** (USL, revealing latent structures in unlabeled data for EDA, clustering, or anomaly detection), **semi-supervised** (SSL, exploiting both labeled and unlabeled data, promising for **FDD** where labeling is costly), or **reinforcement learning** (RL, learning optimal action policies through trial-and-reward interactions).",
 
   ssl:
     "**Semi-supervised learning** exploits **labeled** and **unlabeled** data jointly—often via consistency or pseudo-labeling—improving accuracy when labels are scarce but unlabeled operation is abundant.",
 
   piml:
-    "**Physics-informed ML** integrates **priors**: **feature engineering**, **physics residuals in the loss** (PINNs), **physics-in-architecture** (PANNs), or combining sparse observations with structured constraints. Trade-offs: **soft** physics penalties need **weight tuning**; **hard** architectural priors limit expressiveness if physics is misspecified. PINNs can complement **FEM**; PANNs can slash data needs when structure matches the converter.",
+    "**Physics-informed ML (PIML)** acts as a bridge from generic ML methods to PE-aware solutions, where physical priors constrain the hypothesis space to improve data efficiency, interpretability, and generalization. Broadly grouped into three categories: (1) **Physics-in-initialization**: encodes priors through parameter initialization, but physical consistency is not guaranteed after training. (2) **Physics-in-loss (PINNs)**: incorporates PDE residuals into penalty terms in the training loss; strikes a balance between expressiveness and physical constraints, but requires tuning loss weights. (3) **Physics-in-architecture (PANNs)**: hard-codes PDEs into the model architecture; provides strong physical consistency and zero-shot training-free generalizability, but trades off model expressiveness.",
 
   agentic:
-    "**Agentic AI** combines **LLMs** with **memory** (episodic, semantic, procedural—often **RAG**), **tools** (simulation, parsing, computation), and **planning** (chain-of-thought, ReAct, plan-and-execute). It shifts workflows from one-shot answers to **goal-driven** loops with **guardrails** and **human oversight** for safety-critical decisions.",
+    "**Agentic AI** transforms generative AI from a one-shot, reactive responder to a proactive, autonomous paradigm. It comprises four core elements: **LLMs** (for intent interpretation and synthesis), **memory** (episodic, semantic, and procedural, often retrieved via RAG), **tools** (interfaces for retrieving information and executing actions like simulation or math), and **reasoning and planning** modules (chain-of-thought, plan-and-execute). This shifts workflows to iterative, goal-driven collaboration requiring established engineering protocols for accountability and human oversight.",
 
   sim_batch:
-    "**Simulation** is the primary batch data source: **sample** parameters (grid or **LHS**), **run** the engine with configured I/O, **parse** and **organize** outputs—loop for dataset construction feeding ML and optimization.",
+    "**Simulation tools** provide the primary source of PE data. Automated data acquisition features a three-step framework: (1) parameters are sampled (e.g., Grid-based meshing or Latin hypercube sampling), (2) the simulation engine is run and performance metrics evaluated, and (3) generated data are parsed and organized. This loop can be enhanced with heuristic sampling strategies for efficient and adaptive sampling.",
 
   control_ml:
-    "In **control**, ML can **assist** design (surrogates, tuning) or **embed** as **imitation** controllers or **RL** policies. **Deployment** must respect **latency**, **memory**, and **numerical precision**—motivating **TinyML** (shallow-wide nets, **quantization**, **pruning**, efficient runtimes).",
+    "In **control**, ML can assist control design by modeling control dynamics or searching for optimal control parameters. ML models can also be embedded within the control diagram for: (1) **imitation controllers**, where ML emulates a computationally expensive baseline; (2) **control policy discovery** beyond hand-crafted strategies via RL; and (3) **online control adaptation**. Deployment requires **TinyML** strategies to meet latency and resource constraints.",
 
   tinyml_article:
-    "For edge deployment, **architecture** is a primary lever: at similar **parameter counts**, **shallow-wide** networks often beat **deep-narrow** for **latency**. **Compression** (e.g. **L1** pruning, **quantization**) and runtimes such as **ONNX Runtime** materially speed inference—the tutorial reports large speedups on adaptive modulation examples.",
+    "Because PE control is latency- and resource-constrained, **architecture** is the primary lever for TinyML trade-offs: at similar parameter counts and accuracy, **shallow-wide** networks are preferred over **deep-narrow** ones to avoid increased inference latency. **Compression** strategies like weight pruning (L1 regularization) and quantization (converting FP32 to FP16 or INT8) further reduce inference cost. Deployment on microcontrollers or via inference engines like **ONNX Runtime** can significantly accelerate execution.",
 
   rul:
-    "For **RUL**, **probabilistic** heads (e.g. **Gaussian** with mean and log-variance, trained with **NLL**) express **epistemic** uncertainty—**uncertainty should grow** in **sparse** regions of the input space. **Mixture** heads help when the conditional distribution is **multi-modal**.",
+    "For **RUL** prediction, rather than estimating RUL deterministically, **probabilistic regression** characterizes both the expected RUL and its predictive uncertainty. Using a probabilistic head (e.g., parameterizing RUL as a **Gaussian distribution** with mean and log variance, trained by minimizing **NLL loss**), the model learns input-dependent uncertainty. This enables the quantification of confidence intervals, where uncertainty appropriately grows in sparse or out-of-distribution operating regions.",
 };
 
 function modalityArticleBodies(inKey, outKey) {
@@ -1889,7 +1960,10 @@ function modalityArticleBodies(inKey, outKey) {
  * @returns {{ title: string, body: string }[]}
  */
 export function getArticleSections(state, rec) {
-  const sections = [{ title: "Aim of the tutorial (article)", body: ARTICLE.framing }];
+  const sections = [
+    { title: "What–Which–How framework", body: ARTICLE.whatWhichHow },
+    { title: "Aim of the review article", body: ARTICLE.framing },
+  ];
   const phase = state.phase;
   if (!phase) return sections;
 
@@ -1941,7 +2015,7 @@ export function getArticleSections(state, rec) {
 }
 
 /**
- * Fundamentals_of_AI_for_PE folder ↔ IEEE tutorial section mapping (same spirit as the course README).
+ * Fundamentals_of_AI_for_PE folder ↔ IEEE TIE review article section mapping (same spirit as the course README).
  * @returns {{ folder: string, sections: string, href: string }[]}
  */
 export function getRepoArticleAlignment(state, rec) {
@@ -1963,7 +2037,7 @@ export function getRepoArticleAlignment(state, rec) {
   const pushFromRecommendedLinks = () => {
     if (/Buck_Design/i.test(algoBlob)) push("9_Case_Studies_PE/Buck_Design", "VII-A–VII-C");
     if (/Performance_Modeling_and_Design|one_stop_AI_DAB/i.test(algoBlob)) {
-      push("9_Case_Studies_PE/DAB_Design/Performance_Modeling_and_Design", "IV-B; VII-A–VII-C");
+      push("9_Case_Studies_PE/DAB_Design/Performance_Modeling_and_Design", "VII-A–VII-C");
     }
     if (/Time_Domain_Modeling|time_series_modeling/i.test(algoBlob)) {
       push("9_Case_Studies_PE/DAB_Design/Time_Domain_Modeling", "VII-B");
@@ -1972,8 +2046,8 @@ export function getRepoArticleAlignment(state, rec) {
       push("9_Case_Studies_PE/DAB_Design/Adaptive_Modulation", "VII-D");
     }
     if (/IGBT_Maintenance|rul_prediction/i.test(algoBlob)) push("9_Case_Studies_PE/IGBT_Maintenance", "VII-F");
-    if (/Magnetic_Modeling|magnet_/i.test(algoBlob)) push("9_Case_Studies_PE/Magnetic_Modeling", "III-C; IV-F; IV-G");
-    if (/field_temperature_residual_fnn|Field_Data/i.test(algoBlob)) push("4_Neural_Network/Field_Data", "III-C; IV-F; IV-G");
+    if (/Magnetic_Modeling|magnet_/i.test(algoBlob)) push("9_Case_Studies_PE/Magnetic_Modeling", "II-C; VII-B");
+    if (/field_temperature_residual_fnn|Field_Data/i.test(algoBlob)) push("4_Neural_Network/Field_Data", "II-C; III-F; III-G");
   };
 
   const hasPann = algos.some((a) => /PANN|physics-in-architecture/i.test(`${a.name || ""} ${a.intro || ""}`));
@@ -1994,26 +2068,28 @@ export function getRepoArticleAlignment(state, rec) {
     (phase === "control" && state.controlMode === "assist" && state.assistBranch === "optimization")
   ) {
     if (state.optDim === "high") {
-      push("7_Reinforcement_Learning", "IV-D; IV-F — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
+      push("7_Reinforcement_Learning", "III-D — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
     } else {
-      push("1_MHA/Single_Objective_MHA", "II-A; II-C; II-D");
-      if (state.optMoo) push("1_MHA/Multi_Objective_MHA", "II-B; II-C");
+      push("1_MHA/Single_Objective_MHA", "V-A; V-C");
+      if (state.optMoo) push("1_MHA/Multi_Objective_MHA", "V-B; V-C");
     }
   }
 
   // Process automation
   if (phase === "design" && state.designGoal === "process") {
-    if (state.processKind === "sim") push("8_PE_Simulation_Automation", "IV-A");
+    if (state.processKind === "sim") push("8_PE_Simulation_Automation", "III-A");
     else push("6_Agentic_AI", "VI");
   }
 
   // Control (embedded policy / TinyML)
   if (phase === "control" && state.controlMode === "controller") {
     if (rec.flags?.nn) {
-      push("4_Neural_Network/Fundamentals", "III; IV-C; IV-D; IV-F");
-      push("4_Neural_Network/Good_Practices", "IV-G");
+      push("4_Neural_Network/Fundamentals", "III-F");
+      push("4_Neural_Network/Good_Practices", "III-G");
     }
-    if (state.controlPolicy === "rl") push("7_Reinforcement_Learning", "IV-D; IV-F — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
+    if (state.controlPolicy === "rl") {
+      push("7_Reinforcement_Learning", "III-D — DDPG_buck_control.ipynb / RL_buck_control.ipynb (same averaged buck)");
+    }
     if (state.controlDeploy === "online") push("9_Case_Studies_PE/DAB_Design/Adaptive_Modulation", "VII-D");
   }
 
@@ -2028,34 +2104,34 @@ export function getRepoArticleAlignment(state, rec) {
     const m = modelingModalities(mi, mo);
 
     if (rec.extras?.nn) {
-      push("4_Neural_Network/Fundamentals", "III; IV-C; IV-D; IV-F");
-      push("4_Neural_Network/Good_Practices", "IV-G");
+      push("4_Neural_Network/Fundamentals", "III-F");
+      push("4_Neural_Network/Good_Practices", "III-G");
     }
     if (m.hasTabular) {
-      push("2_Classic_ML", "III-A; IV-D; IV-E");
-      push("3_Ensemble_Learning", "III-A; IV-D; IV-E");
+      push("2_Classic_ML", "III-B–III-E");
+      push("3_Ensemble_Learning", "III-E");
     }
-    if (m.hasSignal) push("4_Neural_Network/Signal_Domain", "III-C; IV-F; IV-G");
-    if (m.hasField) push("4_Neural_Network/Field_Data", "III-C; IV-F; IV-G");
-    if (m.hasGraph) push("4_Neural_Network/Graph_NN", "III-E; IV-F");
-    if (m.hasHybrid) push("4_Neural_Network/Multi_Modal_Distribution", "IV-E; IV-F");
+    if (m.hasSignal) push("4_Neural_Network/Signal_Domain", "II-B; III-F");
+    if (m.hasField) push("4_Neural_Network/Field_Data", "II-C; III-F; III-G");
+    if (m.hasGraph) push("4_Neural_Network/Graph_NN", "II-D; III-E");
+    if (m.hasHybrid) push("4_Neural_Network/Multi_Modal_Distribution", "III-F");
     if (rec.flags?.piml) {
-      push("5_PIML/PINN", "V");
-      if (hasPann || m.hasField) push("5_PIML/PANN", "V-C; VII-E");
+      push("5_PIML/PINN", "IV-A–IV-C");
+      if (hasPann || m.hasField) push("5_PIML/PANN", "IV-B; VII-E");
     }
     pushFromRecommendedLinks();
   }
 
   // FDD
   if (phase === "maintenance" && state.maintKind === "fdd") {
-    push("2_Classic_ML", "III-A; IV-D; IV-E");
-    push("3_Ensemble_Learning", "III-A; IV-D; IV-E");
+    push("2_Classic_ML", "III-B–III-E");
+    push("3_Ensemble_Learning", "III-E");
     const mod = state.fddModality || "tabular";
-    if (mod === "signal") push("4_Neural_Network/Signal_Domain", "III-C; IV-F; IV-G");
-    if (mod === "graph") push("4_Neural_Network/Graph_NN", "III-E; IV-F");
+    if (mod === "signal") push("4_Neural_Network/Signal_Domain", "II-B; III-F");
+    if (mod === "graph") push("4_Neural_Network/Graph_NN", "II-D; III-E");
     if (mod === "unstructured" || mod === "tabular") {
       if (rec.extras?.nn) {
-        push("4_Neural_Network/Fundamentals", "III; IV-C; IV-D; IV-F");
+        push("4_Neural_Network/Fundamentals", "III-F");
       }
     }
     pushFromRecommendedLinks();
@@ -2063,8 +2139,8 @@ export function getRepoArticleAlignment(state, rec) {
 
   // RUL
   if (phase === "maintenance" && state.maintKind === "rul") {
-    push("4_Neural_Network/Multi_Modal_Distribution", "IV-E; IV-F");
-    push("4_Neural_Network/Signal_Domain", "III-C; IV-F; IV-G");
+    push("4_Neural_Network/Multi_Modal_Distribution", "III-F");
+    push("4_Neural_Network/Signal_Domain", "II-B; III-F");
     push("9_Case_Studies_PE/IGBT_Maintenance", "VII-F");
     pushFromRecommendedLinks();
   }
@@ -2073,7 +2149,11 @@ export function getRepoArticleAlignment(state, rec) {
 }
 
 export const FURTHER_READING = [
-  { label: "Course repository root", href: REPO_ROOT },
+  { label: "Fundamentals_of_AI_for_PE on GitHub", href: REPO_ROOT },
   { label: "Repository README (notebook index)", href: ghBlob("README.md") },
-  { label: "Case studies README", href: ghBlob(NB.caseReadme) },
+  { label: "Case studies index", href: ghBlob(NB.caseReadme) },
+  { label: "Buck design case study", href: ghBlob(NB.buckReadme) },
+  { label: "DAB design case study", href: ghBlob(NB.dabReadme) },
+  { label: "IGBT maintenance (RUL)", href: ghBlob(NB.igbtReadme) },
+  { label: "Magnetic modeling", href: ghBlob(NB.magnetReadme) },
 ];
