@@ -949,26 +949,6 @@ button.btn-gpt {
   margin-top: 0.55rem;
 }
 
-.reading-sequence-box {
-  margin-top: 1rem;
-}
-
-.reading-sequence,
-.reading-link-list {
-  margin: 0.4rem 0 0;
-  padding-left: 1.25rem;
-}
-
-.reading-sequence li,
-.reading-link-list li {
-  margin-bottom: 0.4rem;
-}
-
-.reading-meta {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
 .flag-strip {
   display: flex;
   flex-wrap: wrap;

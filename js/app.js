@@ -9,7 +9,6 @@ import {
   buildFDDRecommendation,
   buildRULRecommendation,
   FURTHER_READING,
-  getRepoArticleAlignment,
 } from "./data.js";
 
 /** @typedef {Record<string, string>} State */
@@ -725,53 +724,6 @@ function renderRecommendedAlgorithmsBlock(rec, pathDetailHtml, promotePathOnly) 
   return "";
 }
 
-function dedupeLinks(links) {
-  const seen = new Set();
-  return (links || []).filter((l) => {
-    if (!l?.href || seen.has(l.href)) return false;
-    seen.add(l.href);
-    return true;
-  });
-}
-
-function renderReadingSequence(rec) {
-  const repoRows = getRepoArticleAlignment(state, rec);
-  const algoLinks = dedupeLinks((rec.algorithms || []).flatMap((a) => a.links || []));
-  const notebookLinks = algoLinks.filter((l) => /\.ipynb/i.test(`${l.href} ${l.label}`));
-  const readmeLinks = algoLinks.filter((l) => !notebookLinks.includes(l));
-  const repoList = repoRows
-    .map(
-      (r) =>
-        `<li><a href="${r.href}" target="_blank" rel="noopener">${escapeHtml(r.folder)}</a> <span class="reading-meta">${escapeHtml(
-          r.sections
-        )}</span></li>`
-    )
-    .join("");
-  const notebookList = [...notebookLinks, ...readmeLinks]
-    .map((l) => `<li><a href="${l.href}" target="_blank" rel="noopener">${escapeHtml(l.label)}</a></li>`)
-    .join("");
-
-  return `<div class="extras-box reading-sequence-box">
-    <h3 class="extras-h3">Recommended review article and GitHub reading path</h3>
-    <ol class="reading-sequence">
-      <li><strong>What (Sec. I–II):</strong> Start with the What–Which–How framework and PE data modalities. Identify your lifecycle phase (design / control / maintenance), specific task, and data format (tabular, signal, field, graph, hybrid).</li>
-      <li><strong>Which (Sec. III–VI):</strong> Use the algorithm card to check input representation, model body, output head, and loss against your PE objective. Match the recommended model family to your data modality and learning type.</li>
-      <li><strong>How (Sec. III–VI):</strong> Open each card's <strong>Tuning & validation (full)</strong> box and follow the review-article tuning checklist. Apply PE-specific practices: feature scaling, EDA, physics-informed constraints, and statistical comparison across runs.</li>
-      <li><strong>Case studies (Sec. VII):</strong> Finish with the closest D1–D7 notebook and reproduce the end-to-end workflow before adapting it to your hardware or dataset.</li>
-    </ol>
-    ${
-      repoList
-        ? `<div class="report-subsection"><h4 class="report-h4">Relevant review sections and repo folders</h4><ol class="reading-link-list">${repoList}</ol></div>`
-        : ""
-    }
-    ${
-      notebookList
-        ? `<div class="report-subsection"><h4 class="report-h4">Notebook / README order for this result</h4><ol class="reading-link-list">${notebookList}</ol></div>`
-        : ""
-    }
-  </div>`;
-}
-
 function renderResults(rec) {
   lastRec = rec;
   el("results-panel").hidden = false;
@@ -862,8 +814,6 @@ function renderResults(rec) {
       ${ext ? `<section class="algo-sec"><h4 class="algo-h4">External references</h4><ul class="link-list">${ext}</ul></section>` : ""}
     </article>`;
   });
-
-  h += renderReadingSequence(rec);
 
   if (rec.customBlocks) {
     rec.customBlocks.forEach((b) => {
@@ -1038,44 +988,8 @@ function buildGenAiPrompt(s, rec) {
     ...(selectionLines.length ? selectionLines : ["- (No selections recorded yet — please complete the wizard first.)"]),
   ];
 
-  if (rec) {
-    parts.push("", "## Selector report");
-    if (rec.pathId != null) parts.push(`- Path ID: ${rec.pathId}`);
-    if (rec.title) parts.push(`- Report title: ${stripMarkdown(rec.title)}`);
-    if (rec.summary) parts.push(`- Situation & goal: ${stripMarkdown(rec.summary)}`);
-
-    const flags = [];
-    if (rec.flags?.nn) flags.push("Neural networks");
-    if (rec.flags?.mha) flags.push("Meta-heuristics");
-    if (rec.flags?.tinyml) flags.push("TinyML / edge deployment");
-    if (rec.flags?.piml) flags.push("Physics-informed ML");
-    if (flags.length) parts.push(`- Technique flags: ${flags.join("; ")}`);
-
-    if (rec.algorithms?.length) {
-      parts.push("", "## Recommended algorithms (from selector)");
-      rec.algorithms.forEach((a, i) => {
-        parts.push(`${i + 1}. ${a.name}`);
-        if (a.intro) parts.push(`   Why: ${stripMarkdown(a.intro)}`);
-        if (a.tuning) parts.push(`   Tuning essentials: ${stripMarkdown(a.tuning)}`);
-        parts.push(`   Review-article tuning guide: ${stripMarkdown(reviewTuningGuide(a))}`);
-        parts.push(`   Review article alignment summary: ${stripMarkdown(reviewAlignmentSummary(a, rec))}`);
-        if (a.caseStudy) parts.push(`   GitHub notebook example: ${stripMarkdown(a.caseStudy)}`);
-      });
-    }
-
-    const readingRows = getRepoArticleAlignment(s, rec);
-    const algoLinks = dedupeLinks((rec.algorithms || []).flatMap((a) => a.links || []));
-    if (readingRows.length || algoLinks.length) {
-      parts.push("", "## Recommended review article and GitHub reading path");
-      parts.push("1. Basics: use review article Sec. I–II for What–Which–How and PE data modalities.");
-      parts.push("2. Structure/loss: inspect each algorithm card's input, model body, output head, and loss.");
-      parts.push("3. Tuning: use each algorithm's review-article tuning guide before comparing methods.");
-      parts.push("4. Case studies: reproduce the closest Fundamentals_of_AI_for_PE notebook before adapting.");
-      readingRows.forEach((r) => parts.push(`- Review/repo folder: ${r.folder} (${r.sections})`));
-      algoLinks.slice(0, 8).forEach((l) => parts.push(`- Material: ${l.label} — ${l.href}`));
-    }
-  } else {
-    parts.push("", "Note: I have not reached the final selector report yet — use the selections above only.");
+  if (!rec) {
+    parts.push("", "Note: I have not reached the final result yet — use the selections above only.");
   }
 
   parts.push(
@@ -1086,8 +1000,7 @@ function buildGenAiPrompt(s, rec) {
     "3. (How) A practical tuning checklist for each recommended algorithm with PE-specific constraints (feature scaling, EDA, physics-informed constraints, statistical comparison).",
     "4. Which Fundamentals_of_AI_for_PE GitHub Jupyter notebooks and READMEs I should open first, in what order, and why.",
     "5. Key pitfalls and review-article section references (for example Sec. III-B, Sec. V, Sec. VII-F) most relevant to my path.",
-    "6. A reading sequence: What (Sec. I–II) → Which (Sec. III–VI) → How (Sec. III–VI) → Case studies (Sec. VII).",
-    "7. Clarifying questions only if critical information is still missing.",
+    "6. Clarifying questions only if critical information is still missing.",
     "",
     "Respond in structured sections. Ground advice in the review article What–Which–How framework and the GitHub Jupyter Notebook materials."
   );
